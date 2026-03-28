@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { FocusEngine } from '../engine/FocusEngine';
 import { InputManager } from '../engine/InputManager';
@@ -7,44 +7,275 @@ import {
   openDetail,
   closeDetail,
   setDetailButtonIndex,
+  setActivePage,
+  setNavFocused,
+  setNavIndex,
+  appendSearchChar,
+  deleteSearchChar,
+  clearSearchQuery,
 } from '../state/slices/uiSlice';
-import { selectRows, selectDetailOverlay, selectFocusedTile } from '../state/selectors';
-import { DETAIL_BUTTON_COUNT } from '../utils/constants';
-import type { RootState } from '../state/store';
+import {
+  setContent,
+  setPageContent,
+  switchPage,
+  setSearchResults,
+} from '../state/slices/contentSlice';
+import {
+  selectRows,
+  selectDetailOverlay,
+  selectActivePage,
+  selectNavFocused,
+  selectNavIndex,
+  selectSearchQuery,
+  selectSearchResults,
+  selectPageCache,
+} from '../state/selectors';
+import { DETAIL_BUTTON_COUNT, KEYBOARD_GRID, KEYBOARD_COLS } from '../utils/constants';
+import { NAV_ITEMS } from '../data/pageConfigs';
+import { PAGE_CONFIGS } from '../data/pageConfigs';
+import { fetchRowsFromConfigs, fetchLogosProgressive, searchTmdb } from '../data/tmdb';
+import { generateMockContent } from '../data/mockContent';
+import type { PageId } from '../state/slices/uiSlice';
+
+const KEYBOARD_ROW_COUNT = Math.ceil(KEYBOARD_GRID.length / KEYBOARD_COLS);
+
+function buildKeyboardRows() {
+  const rows: { id: string; tileCount: number }[] = [];
+  for (let r = 0; r < KEYBOARD_ROW_COUNT; r++) {
+    const startIdx = r * KEYBOARD_COLS;
+    const keysInRow = KEYBOARD_GRID.slice(startIdx, startIdx + KEYBOARD_COLS);
+    rows.push({ id: `kb-row-${r}`, tileCount: keysInRow.length });
+  }
+  return rows;
+}
 
 export function useInputNavigation() {
   const dispatch = useDispatch();
   const rows = useSelector(selectRows);
   const overlay = useSelector(selectDetailOverlay);
-  const focusedTile = useSelector(selectFocusedTile);
+  const activePage = useSelector(selectActivePage);
+  const navFocused = useSelector(selectNavFocused);
+  const navIndex = useSelector(selectNavIndex);
+  const searchQuery = useSelector(selectSearchQuery);
+  const searchResults = useSelector(selectSearchResults);
+  const pageCache = useSelector(selectPageCache);
 
-  // Use refs so the callback always has fresh state without re-subscribing
   const overlayRef = useRef(overlay);
   overlayRef.current = overlay;
-  const focusedTileRef = useRef(focusedTile);
-  focusedTileRef.current = focusedTile;
+  const activePageRef = useRef(activePage);
+  activePageRef.current = activePage;
+  const navFocusedRef = useRef(navFocused);
+  navFocusedRef.current = navFocused;
+  const navIndexRef = useRef(navIndex);
+  navIndexRef.current = navIndex;
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
+  const pageCacheRef = useRef(pageCache);
+  pageCacheRef.current = pageCache;
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const searchResultsRef = useRef(searchResults);
+  searchResultsRef.current = searchResults;
 
   const engineRef = useRef<FocusEngine | null>(null);
   const inputRef = useRef<InputManager | null>(null);
+  const searchTimerRef = useRef<number | null>(null);
 
+  const loadPage = useCallback(async (pageId: PageId) => {
+    if (pageCacheRef.current[pageId]) {
+      dispatch(switchPage(pageId));
+      return;
+    }
+
+    if (pageId === 'myList' || pageId === 'search') return;
+
+    const configs = PAGE_CONFIGS[pageId];
+    if (!configs) return;
+
+    try {
+      const fetchedRows = await fetchRowsFromConfigs(configs);
+      if (fetchedRows.length > 0) {
+        dispatch(setPageContent({ page: pageId, rows: fetchedRows }));
+        dispatch(setContent(fetchedRows));
+        fetchLogosProgressive(fetchedRows, (updated) => {
+          dispatch(setPageContent({ page: pageId, rows: updated }));
+          if (activePageRef.current === pageId) {
+            dispatch(setContent(updated));
+          }
+        });
+      } else {
+        dispatch(setContent(generateMockContent()));
+      }
+    } catch {
+      dispatch(setContent(generateMockContent()));
+    }
+  }, [dispatch]);
+
+  const triggerSearch = useCallback((query: string) => {
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+    searchTimerRef.current = window.setTimeout(async () => {
+      if (query.trim()) {
+        const results = await searchTmdb(query);
+        dispatch(setSearchResults(results));
+        // Update engine rows to include search results
+        if (engineRef.current && activePageRef.current === 'search') {
+          const kbRows = buildKeyboardRows();
+          const resultRows = results.map((r) => ({ id: r.id, tileCount: r.tiles.length }));
+          engineRef.current.setRows([...kbRows, ...resultRows]);
+        }
+        // Progressive logo loading for search results
+        if (results.length > 0) {
+          fetchLogosProgressive(results, (updated) => {
+            if (activePageRef.current === 'search') {
+              dispatch(setSearchResults(updated));
+            }
+          });
+        }
+      } else {
+        dispatch(setSearchResults([]));
+        // Reset engine to keyboard-only rows
+        if (engineRef.current && activePageRef.current === 'search') {
+          engineRef.current.setRows(buildKeyboardRows());
+        }
+      }
+    }, 500);
+  }, [dispatch]);
+
+  // Engine + InputManager initialization — runs once
   useEffect(() => {
     const engine = new FocusEngine();
     const input = new InputManager();
     engineRef.current = engine;
     inputRef.current = input;
 
-    engine.setRows(
-      rows.map((r) => ({ id: r.id, tileCount: r.tiles.length }))
-    );
+    engine.setNavItemCount(NAV_ITEMS.length);
+    const activeIdx = NAV_ITEMS.findIndex((n) => n.id === activePageRef.current);
+    engine.setNavRestoreIndex(activeIdx >= 0 ? activeIdx : 0);
+
+    // Set initial rows based on current page
+    if (activePageRef.current === 'search') {
+      engine.setRows(buildKeyboardRows(), true);
+      engine.setRowMemoryEnabled(false);
+    } else if (activePageRef.current === 'myList') {
+      engine.setRows([{ id: 'mylist-cta', tileCount: 1 }], true);
+    } else {
+      engine.setRows(
+        rowsRef.current.map((r) => ({ id: r.id, tileCount: r.tiles.length }))
+      );
+    }
 
     engine.onFocusChange((_prev, next) => {
-      dispatch(setFocus({ rowIndex: next.rowIndex, tileIndex: next.tileIndex }));
+      if (next.rowIndex === -1) {
+        dispatch(setNavFocused(true));
+        dispatch(setNavIndex(next.tileIndex));
+      } else {
+        dispatch(setNavFocused(false));
+        dispatch(setFocus({ rowIndex: next.rowIndex, tileIndex: next.tileIndex }));
+      }
     });
 
     engine.onSelect((pos) => {
       const ov = overlayRef.current;
-      if (ov.open) return; // buttons in overlay handled separately
-      const row = rows[pos.rowIndex];
+      if (ov.open) return;
+
+      if (pos.rowIndex === -1) {
+        const navItem = NAV_ITEMS[pos.tileIndex];
+        if (navItem) {
+          dispatch(setActivePage(navItem.id));
+          engine.setNavRestoreIndex(pos.tileIndex);
+          if (navItem.id !== 'myList' && navItem.id !== 'search') {
+            loadPage(navItem.id);
+          }
+          if (navItem.id === 'search') {
+            dispatch(setSearchResults([]));
+            dispatch(clearSearchQuery());
+          }
+          // Move focus down to content and update engine rows for new page
+          dispatch(setNavFocused(false));
+          dispatch(setFocus({ rowIndex: 0, tileIndex: 0 }));
+          engine.setPosition({ rowIndex: 0, tileIndex: 0 });
+
+          if (navItem.id === 'search') {
+            engine.setRows(buildKeyboardRows(), true);
+            engine.setRowMemoryEnabled(false);
+            input.setRawKeyCallback((key: string) => {
+              if (key === 'Backspace') {
+                dispatch(deleteSearchChar());
+                const newQuery = searchQueryRef.current.slice(0, -1);
+                triggerSearch(newQuery);
+              } else {
+                dispatch(appendSearchChar(key.toLowerCase()));
+                const newQuery = searchQueryRef.current + key.toLowerCase();
+                triggerSearch(newQuery);
+              }
+            });
+          } else if (navItem.id === 'myList') {
+            engine.setRows([{ id: 'mylist-cta', tileCount: 1 }], true);
+            engine.setRowMemoryEnabled(true);
+            input.setRawKeyCallback(null);
+          } else {
+            // Clear row memory when switching pages, content rows set by sync effect
+            engine.setRows(
+              rowsRef.current.map((r) => ({ id: r.id, tileCount: r.tiles.length })),
+              true
+            );
+            engine.setRowMemoryEnabled(true);
+            input.setRawKeyCallback(null);
+          }
+        }
+        return;
+      }
+
+      // Handle search keyboard grid SELECT
+      if (activePageRef.current === 'search') {
+        if (pos.rowIndex < KEYBOARD_ROW_COUNT) {
+          const keyIndex = pos.rowIndex * KEYBOARD_COLS + pos.tileIndex;
+          const key = KEYBOARD_GRID[keyIndex];
+          if (key !== undefined) {
+            if (key === 'DEL') {
+              dispatch(deleteSearchChar());
+              const newQuery = searchQueryRef.current.slice(0, -1);
+              triggerSearch(newQuery);
+            } else if (key === 'CLR') {
+              dispatch(clearSearchQuery());
+              dispatch(setSearchResults([]));
+              // Reset engine to keyboard-only
+              engine.setRows(buildKeyboardRows());
+            } else if (key === 'SPACE') {
+              dispatch(appendSearchChar(' '));
+              const newQuery = searchQueryRef.current + ' ';
+              triggerSearch(newQuery);
+            } else {
+              dispatch(appendSearchChar(key.toLowerCase()));
+              const newQuery = searchQueryRef.current + key.toLowerCase();
+              triggerSearch(newQuery);
+            }
+          }
+          return;
+        }
+        // Search result tile selected
+        const resultRowIdx = pos.rowIndex - KEYBOARD_ROW_COUNT;
+        const resultRow = searchResultsRef.current[resultRowIdx];
+        const tile = resultRow?.tiles[pos.tileIndex];
+        if (tile) dispatch(openDetail(tile));
+        return;
+      }
+
+      // My List "Browse Content" button
+      if (activePageRef.current === 'myList' && pos.rowIndex === 0) {
+        dispatch(setActivePage('home'));
+        engine.setNavRestoreIndex(0);
+        loadPage('home');
+        dispatch(setFocus({ rowIndex: 0, tileIndex: 0 }));
+        engine.setPosition({ rowIndex: 0, tileIndex: 0 });
+        return;
+      }
+
+      // Normal tile select
+      const currentRows = rowsRef.current;
+      const row = currentRows[pos.rowIndex];
       const tile = row?.tiles[pos.tileIndex];
       if (tile) dispatch(openDetail(tile));
     });
@@ -58,32 +289,52 @@ export function useInputNavigation() {
     input.start((action) => {
       const ov = overlayRef.current;
       if (ov.open) {
-        // Navigate overlay buttons
         if (action === 'LEFT') {
-          dispatch(
-            setDetailButtonIndex(Math.max(0, ov.buttonIndex - 1))
-          );
+          dispatch(setDetailButtonIndex(Math.max(0, ov.buttonIndex - 1)));
         } else if (action === 'RIGHT') {
-          dispatch(
-            setDetailButtonIndex(
-              Math.min(DETAIL_BUTTON_COUNT - 1, ov.buttonIndex + 1)
-            )
-          );
+          dispatch(setDetailButtonIndex(Math.min(DETAIL_BUTTON_COUNT - 1, ov.buttonIndex + 1)));
         } else if (action === 'BACK') {
           dispatch(closeDetail());
         }
-        // SELECT on overlay button — no-op for now
         return;
       }
 
-      // Toggle perf HUD handled at window level in App
       engine.navigate(action);
     });
 
+    // Set up raw key callback if starting on search page
+    if (activePageRef.current === 'search') {
+      input.setRawKeyCallback((key: string) => {
+        if (key === 'Backspace') {
+          dispatch(deleteSearchChar());
+          const newQuery = searchQueryRef.current.slice(0, -1);
+          triggerSearch(newQuery);
+        } else {
+          dispatch(appendSearchChar(key.toLowerCase()));
+          const newQuery = searchQueryRef.current + key.toLowerCase();
+          triggerSearch(newQuery);
+        }
+      });
+    }
+
     return () => {
       input.dispose();
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+      }
     };
-  }, [rows, dispatch]);
+  }, [dispatch, loadPage, triggerSearch]); // Engine created once; rows synced via separate effect
+
+  // Sync engine rows when content rows change (for content pages only)
+  useEffect(() => {
+    if (!engineRef.current) return;
+    // Only update rows for content pages — search/myList manage their own rows
+    if (activePageRef.current !== 'search' && activePageRef.current !== 'myList') {
+      engineRef.current.setRows(
+        rows.map((r) => ({ id: r.id, tileCount: r.tiles.length }))
+      );
+    }
+  }, [rows]);
 
   return engineRef;
 }

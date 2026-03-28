@@ -37,7 +37,7 @@ const GENRE_MAP: Record<number, string> = {
   10767: 'Talk', 10768: 'War & Politics',
 };
 
-function toTile(item: TmdbResult): TileData | null {
+export function toTile(item: TmdbResult): TileData | null {
   if (!item.backdrop_path) return null;
   const year = parseInt(
     (item.release_date || item.first_air_date || '0000').slice(0, 4),
@@ -61,14 +61,14 @@ function toTile(item: TmdbResult): TileData | null {
   };
 }
 
-async function fetchTmdb(url: string): Promise<TmdbResult[]> {
+export async function fetchTmdb(url: string): Promise<TmdbResult[]> {
   const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`TMDB ${res.status}`);
   const data: TmdbResponse = await res.json();
   return data.results;
 }
 
-interface RowConfig {
+export interface RowConfig {
   title: string;
   url: string;
 }
@@ -188,6 +188,69 @@ interface TmdbImageResult {
 
 interface TmdbImagesResponse {
   logos: TmdbImageResult[];
+}
+
+/**
+ * Fetch rows from an array of RowConfig objects.
+ * Reusable for any page's content.
+ */
+export async function fetchRowsFromConfigs(configs: RowConfig[]): Promise<RowData[]> {
+  const results = await Promise.all(
+    configs.map(async (config, idx) => {
+      try {
+        const items = await fetchTmdb(config.url);
+        const tiles = items
+          .map(toTile)
+          .filter((t): t is TileData => t !== null);
+        return {
+          id: `row-${idx}`,
+          title: config.title,
+          tiles,
+        };
+      } catch {
+        return null;
+      }
+    })
+  );
+  return results.filter((r): r is RowData => r !== null && r.tiles.length > 0);
+}
+
+/**
+ * Search TMDB for movies and TV shows matching a query.
+ */
+export async function searchTmdb(query: string): Promise<RowData[]> {
+  if (!query.trim()) return [];
+  try {
+    const items = await fetchTmdb(
+      `https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(query)}&include_adult=false`
+    );
+    const movieTiles = items
+      .filter((i) => (i.media_type === 'movie' || (!i.media_type && i.release_date)) && i.backdrop_path)
+      .map(toTile)
+      .filter((t): t is TileData => t !== null);
+    const tvTiles = items
+      .filter((i) => (i.media_type === 'tv' || (!i.media_type && i.first_air_date)) && i.backdrop_path)
+      .map(toTile)
+      .filter((t): t is TileData => t !== null);
+
+    const rows: RowData[] = [];
+    if (movieTiles.length > 0) {
+      rows.push({ id: 'search-movies', title: 'Movies', tiles: movieTiles });
+    }
+    if (tvTiles.length > 0) {
+      rows.push({ id: 'search-tv', title: 'TV Shows', tiles: tvTiles });
+    }
+    // Also add a combined "Top Results" row if we have both
+    const allTiles = items
+      .map(toTile)
+      .filter((t): t is TileData => t !== null);
+    if (allTiles.length > 0) {
+      rows.unshift({ id: 'search-top', title: `Top Results for "${query}"`, tiles: allTiles });
+    }
+    return rows;
+  } catch {
+    return [];
+  }
 }
 
 /**

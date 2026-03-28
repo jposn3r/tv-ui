@@ -15,7 +15,34 @@ Tracking remaining work for the TV UI project. Updated as we go.
 - [x] Hero banner with logo title treatment + parallax
 - [x] Row scroll holds position on vertical nav, only scrolls on Left/Right
 
+### Top Navigation + Multi-Page + Search
+- [x] Netflix-style top nav bar (Home, TV Shows, Movies, New & Popular, My List, Search)
+- [x] Nav bar focus: UP from row 0 → nav, DOWN from nav → content
+- [x] Nav focus lands on active page item (not always Home)
+- [x] Per-page TMDB content (TV Shows, Movies, New & Popular each have unique row configs)
+- [x] Page content caching — switching back to a visited page is instant
+- [x] Progressive logo loading per page
+- [x] Search page with on-screen keyboard grid (7×6, arrow-navigable)
+- [x] Physical keyboard typing in search (WASD disabled in search mode, Backspace deletes)
+- [x] TMDB search integration with 500ms debounce
+- [x] Search results displayed as navigable content rows
+- [x] My List empty state with focusable "Browse Content" CTA
+- [x] FocusEngine extended: nav row (rowIndex -1), navRestoreIndex, nav item count
+
 ## Up Next
+
+### Tile Trailer Previews (Priority)
+- [ ] 2-second focus dwell timer on tiles triggers trailer playback
+- [ ] Tile grows by 20% when trailer starts playing
+- [ ] Video element mount/unmount and loading states
+- [ ] Elegant shrink-back animation when navigating away
+- [ ] Horizontal/vertical shrink direction based on navigation action
+
+### Hero Trailers (Priority)
+- [ ] Auto-playing trailer in hero banner for each page
+- [ ] Mute/unmute toggle button (easy to find with focus)
+- [ ] Trailer fetched from TMDB videos endpoint
+- [ ] Graceful fallback to static backdrop when no trailer available
 
 ### Phase 2: Virtualized Rendering
 - [ ] VirtualList engine (vertical — only mount visible rows + 1 buffer each direction)

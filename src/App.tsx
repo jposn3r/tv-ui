@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { Shell } from './components/Shell';
 import { useInputNavigation } from './hooks/useInputNavigation';
-import { setContent } from './state/slices/contentSlice';
+import { setContent, setPageContent } from './state/slices/contentSlice';
 import { generateMockContent } from './data/mockContent';
 import { fetchTmdbContent, fetchLogosProgressive } from './data/tmdb';
 
@@ -13,18 +13,22 @@ export default function App() {
     fetchTmdbContent()
       .then((rows) => {
         if (rows.length > 0) {
-          // Show content immediately with backdrops
           dispatch(setContent(rows));
-          // Stream logos in progressively
+          dispatch(setPageContent({ page: 'home', rows }));
           fetchLogosProgressive(rows, (updated) => {
             dispatch(setContent(updated));
+            dispatch(setPageContent({ page: 'home', rows: updated }));
           });
         } else {
-          dispatch(setContent(generateMockContent()));
+          const mock = generateMockContent();
+          dispatch(setContent(mock));
+          dispatch(setPageContent({ page: 'home', rows: mock }));
         }
       })
       .catch(() => {
-        dispatch(setContent(generateMockContent()));
+        const mock = generateMockContent();
+        dispatch(setContent(mock));
+        dispatch(setPageContent({ page: 'home', rows: mock }));
       });
   }, [dispatch]);
 

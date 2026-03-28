@@ -1,7 +1,7 @@
 export type NavigationAction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'SELECT' | 'BACK';
 
 export interface FocusPosition {
-  rowIndex: number;
+  rowIndex: number; // -1 = nav bar, 0+ = content rows
   tileIndex: number;
 }
 
@@ -25,6 +25,9 @@ export class FocusEngine {
   private position: FocusPosition = { rowIndex: 0, tileIndex: 0 };
   private rowMemory: Record<number, number> = {};
   private rows: RowDescriptor[] = [];
+  private navItemCount = 0;
+  private navRestoreIndex = 0;
+  private rowMemoryEnabled = true;
   private listeners: FocusChangeCallback[] = [];
   private selectListeners: Array<(pos: FocusPosition) => void> = [];
   private backListeners: Array<() => void> = [];
@@ -40,18 +43,39 @@ export class FocusEngine {
     };
   }
 
-  setRows(rows: RowDescriptor[]): void {
+  setRows(rows: RowDescriptor[], clearMemory = false): void {
     this.rows = rows;
-    // Clamp current position if rows changed
-    if (this.position.rowIndex >= rows.length) {
-      this.position.rowIndex = Math.max(0, rows.length - 1);
+    if (clearMemory) {
+      this.rowMemory = {};
     }
-    if (rows.length > 0) {
-      const maxTile = rows[this.position.rowIndex].tileCount - 1;
-      if (this.position.tileIndex > maxTile) {
-        this.position.tileIndex = Math.max(0, maxTile);
+    // Clamp current position if rows changed
+    if (this.position.rowIndex >= 0) {
+      if (this.position.rowIndex >= rows.length) {
+        this.position.rowIndex = Math.max(0, rows.length - 1);
+      }
+      if (rows.length > 0) {
+        const maxTile = rows[this.position.rowIndex].tileCount - 1;
+        if (this.position.tileIndex > maxTile) {
+          this.position.tileIndex = Math.max(0, maxTile);
+        }
       }
     }
+  }
+
+  setNavItemCount(count: number): void {
+    this.navItemCount = count;
+  }
+
+  setNavRestoreIndex(index: number): void {
+    this.navRestoreIndex = index;
+  }
+
+  setRowMemoryEnabled(enabled: boolean): void {
+    this.rowMemoryEnabled = enabled;
+  }
+
+  setPosition(pos: FocusPosition): void {
+    this.position = { ...pos };
   }
 
   onFocusChange(cb: FocusChangeCallback): () => void {
@@ -76,7 +100,7 @@ export class FocusEngine {
   }
 
   navigate(action: NavigationAction): void {
-    if (this.rows.length === 0) return;
+    if (this.rows.length === 0 && this.position.rowIndex >= 0) return;
 
     if (action === 'SELECT') {
       this.selectListeners.forEach((cb) => cb(this.getPosition()));
@@ -101,6 +125,28 @@ export class FocusEngine {
 
   private computeNext(action: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'): FocusPosition {
     const { rowIndex, tileIndex } = this.position;
+
+    // Nav bar row (rowIndex === -1)
+    if (rowIndex === -1) {
+      switch (action) {
+        case 'LEFT':
+          return { rowIndex: -1, tileIndex: Math.max(0, tileIndex - 1) };
+        case 'RIGHT':
+          return { rowIndex: -1, tileIndex: Math.min(this.navItemCount - 1, tileIndex + 1) };
+        case 'DOWN': {
+          // Move from nav to first content row
+          if (this.rows.length === 0) return { rowIndex: -1, tileIndex };
+          const remembered = this.rowMemory[0] ?? 0;
+          return {
+            rowIndex: 0,
+            tileIndex: Math.min(remembered, this.rows[0].tileCount - 1),
+          };
+        }
+        case 'UP':
+          return { rowIndex: -1, tileIndex }; // Already at top
+      }
+    }
+
     const currentRow = this.rows[rowIndex];
 
     switch (action) {
@@ -117,28 +163,47 @@ export class FocusEngine {
         };
 
       case 'UP': {
-        if (rowIndex === 0) return { rowIndex, tileIndex };
-        // Save current tile position for this row
-        this.rowMemory[rowIndex] = tileIndex;
-        const newRow = rowIndex - 1;
-        const targetRow = this.rows[newRow];
-        // Restore remembered position, clamped to new row's length
-        const remembered = this.rowMemory[newRow] ?? tileIndex;
+        if (rowIndex === 0) {
+          // Move to nav bar — use the stored nav index (active page)
+          if (this.navItemCount > 0) {
+            if (this.rowMemoryEnabled) this.rowMemory[0] = tileIndex;
+            return { rowIndex: -1, tileIndex: this.navRestoreIndex };
+          }
+          return { rowIndex, tileIndex };
+        }
+        const upRow = rowIndex - 1;
+        const upTarget = this.rows[upRow];
+        if (this.rowMemoryEnabled) {
+          this.rowMemory[rowIndex] = tileIndex;
+          const remembered = this.rowMemory[upRow] ?? tileIndex;
+          return {
+            rowIndex: upRow,
+            tileIndex: Math.min(remembered, upTarget.tileCount - 1),
+          };
+        }
+        // No row memory: just clamp current column to new row
         return {
-          rowIndex: newRow,
-          tileIndex: Math.min(remembered, targetRow.tileCount - 1),
+          rowIndex: upRow,
+          tileIndex: Math.min(tileIndex, upTarget.tileCount - 1),
         };
       }
 
       case 'DOWN': {
         if (rowIndex >= this.rows.length - 1) return { rowIndex, tileIndex };
-        this.rowMemory[rowIndex] = tileIndex;
-        const newRow = rowIndex + 1;
-        const targetRow = this.rows[newRow];
-        const remembered = this.rowMemory[newRow] ?? tileIndex;
+        const downRow = rowIndex + 1;
+        const downTarget = this.rows[downRow];
+        if (this.rowMemoryEnabled) {
+          this.rowMemory[rowIndex] = tileIndex;
+          const remembered = this.rowMemory[downRow] ?? tileIndex;
+          return {
+            rowIndex: downRow,
+            tileIndex: Math.min(remembered, downTarget.tileCount - 1),
+          };
+        }
+        // No row memory: just clamp current column to new row
         return {
-          rowIndex: newRow,
-          tileIndex: Math.min(remembered, targetRow.tileCount - 1),
+          rowIndex: downRow,
+          tileIndex: Math.min(tileIndex, downTarget.tileCount - 1),
         };
       }
     }

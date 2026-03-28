@@ -1,4 +1,4 @@
-# TV UI
+# JFlix
 
 A TV-style content browser built to behave like an actual TV app: keyboard-only navigation, custom focus management, smooth animations, and no mouse interactions. Built as a portfolio piece demonstrating the engineering challenges of TV UI development.
 
@@ -35,11 +35,12 @@ Open `http://localhost:5173` in your browser.
 
 | Key | Action |
 |-----|--------|
-| Arrow Keys | Navigate the 2D content grid |
-| Enter / Space | Open detail overlay |
-| Escape / Backspace | Close detail overlay |
+| Arrow Keys | Navigate the 2D content grid / nav bar / search keyboard |
+| Enter / Space | Select (open detail, switch page, press search key) |
+| Escape / Backspace | Close detail overlay (Backspace deletes in search) |
 | Left / Right (in overlay) | Navigate overlay buttons |
-| WASD | Alternative directional navigation |
+| WASD | Alternative directional nav (passes through as letters in search) |
+| Any letter/number | Direct typing in search mode |
 
 Mouse is intentionally disabled — TV apps don't have cursors.
 
@@ -48,18 +49,21 @@ Mouse is intentionally disabled — TV apps don't have cursors.
 ```
 src/
 ├── engine/          # Framework-agnostic core logic
-│   ├── FocusEngine  # 2D grid navigation with row memory
-│   └── InputManager # Keyboard → abstract actions, custom key repeat
+│   ├── FocusEngine  # 2D grid nav with row memory, nav bar support
+│   └── InputManager # Keyboard → abstract actions, raw key passthrough for search
 ├── components/      # React UI layer
-│   ├── Shell        # App shell with vertical scrolling
+│   ├── Shell        # App shell with per-page vertical scrolling
+│   ├── NavBar       # Top navigation (Home, TV Shows, Movies, New & Popular, My List, Search)
 │   ├── ContentRow   # Horizontal scrollable row
 │   ├── ContentTile  # Individual content card with logo overlay
 │   ├── HeroBanner   # Featured content with parallax + logo treatment
+│   ├── SearchPage   # On-screen keyboard grid + TMDB search results
+│   ├── MyListPage   # Empty state with focusable CTA
 │   ├── DetailOverlay# Expanded view on Enter
 │   └── FocusRing    # Scale + shadow focus indicator
 ├── hooks/           # React bridges to engines
-├── state/           # Redux store, slices, selectors
-├── data/            # TMDB API integration + mock fallback
+├── state/           # Redux store, slices (focus, content, UI), selectors
+├── data/            # TMDB integration, per-page configs, mock fallback
 └── styles/          # JS-object theme tokens
 ```
 
@@ -72,4 +76,4 @@ src/
 
 ## Project Status
 
-Phase 1 (Focus Engine + Navigation) is complete. See [NEXTSTEPS.md](NEXTSTEPS.md) for remaining phases including virtualization, rAF-driven scroll animations, performance HUD, and accessibility.
+Phase 1 (Focus Engine + Navigation) and top navigation with multi-page + search are complete. See [NEXTSTEPS.md](NEXTSTEPS.md) for remaining work including trailers, virtualization, smooth scroll animations, performance HUD, and accessibility.

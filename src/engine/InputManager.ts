@@ -1,6 +1,7 @@
 import type { NavigationAction } from './FocusEngine';
 
 type ActionCallback = (action: NavigationAction) => void;
+type RawKeyCallback = (key: string) => void;
 
 const KEY_MAP: Record<string, NavigationAction> = {
   ArrowUp: 'UP',
@@ -27,28 +28,43 @@ const REPEAT_INTERVAL = 100;
 
 export class InputManager {
   private callback: ActionCallback | null = null;
+  private rawKeyCallback: RawKeyCallback | null = null;
   private repeatTimer: number | null = null;
   private repeatKey: string | null = null;
   private disposed = false;
 
   private handleKeyDown = (e: KeyboardEvent): void => {
     const action = KEY_MAP[e.key];
-    if (!action) return;
+    // When rawKeyCallback is active (search mode), only use arrow keys/Enter/Escape for navigation
+    // Let letter keys through as raw input instead of WASD navigation
+    const isWasd = 'wasdWASD'.includes(e.key);
+    const isBackspace = e.key === 'Backspace';
+    const useAsNav = action && !(isWasd && this.rawKeyCallback) && !(isBackspace && this.rawKeyCallback);
 
-    e.preventDefault();
+    if (useAsNav) {
+      e.preventDefault();
 
-    // Ignore OS-level key repeat — we handle our own
-    if (e.repeat) return;
+      // Ignore OS-level key repeat — we handle our own
+      if (e.repeat) return;
 
-    this.callback?.(action);
+      this.callback?.(action);
 
-    // Start repeat handling for directional keys
-    if (action !== 'SELECT' && action !== 'BACK') {
-      this.stopRepeat();
-      this.repeatKey = e.key;
-      this.repeatTimer = window.setTimeout(() => {
-        this.startRepeat(action);
-      }, INITIAL_DELAY);
+      // Start repeat handling for directional keys
+      if (action !== 'SELECT' && action !== 'BACK') {
+        this.stopRepeat();
+        this.repeatKey = e.key;
+        this.repeatTimer = window.setTimeout(() => {
+          this.startRepeat(action);
+        }, INITIAL_DELAY);
+      }
+    } else if (this.rawKeyCallback && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Pass printable characters and Backspace to raw key callback (for search typing)
+      if (e.key.length === 1 || e.key === 'Backspace') {
+        e.preventDefault();
+        if (!e.repeat) {
+          this.rawKeyCallback(e.key);
+        }
+      }
     }
   };
 
@@ -79,9 +95,14 @@ export class InputManager {
     window.addEventListener('keyup', this.handleKeyUp);
   }
 
+  setRawKeyCallback(callback: RawKeyCallback | null): void {
+    this.rawKeyCallback = callback;
+  }
+
   stop(): void {
     this.stopRepeat();
     this.callback = null;
+    this.rawKeyCallback = null;
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
   }
