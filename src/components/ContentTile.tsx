@@ -10,26 +10,26 @@ import { selectLastNavAction, selectTrailerMuted, selectTrailerPaused } from '..
 import { setTileTrailerPlaying, setActiveTrailer } from '../state/slices/trailerSlice';
 import type { TileData } from '../state/slices/contentSlice';
 import type { NavigationAction } from '../engine/FocusEngine';
+import { tileCounter } from '../utils/tileCounter';
 
-/** Logo with fade-in on load — no flash */
+// Check if an image URL is already in the browser cache
+function isImageCached(src: string): boolean {
+  const img = new Image();
+  img.src = src;
+  return img.complete && img.naturalWidth > 0;
+}
+
+/** Logo with fade-in on load — instant for cached images, no flash */
 function TileLogo({ logoPath, logoOnRight, isFocused, fadeOut = false }: {
   logoPath: string;
   logoOnRight: boolean;
   isFocused: boolean;
   fadeOut?: boolean;
 }) {
-  const imgRef = useRef<HTMLImageElement>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  // When logoPath changes, check if already cached; if not, hide until onLoad
-  useEffect(() => {
-    const img = imgRef.current;
-    if (img && img.complete && img.naturalWidth > 0) {
-      setLoaded(true);
-    } else {
-      setLoaded(false);
-    }
-  }, [logoPath]);
+  const src = getTmdbLogoUrl(logoPath, 'w300');
+  // If cached, start loaded immediately — no fade, no flash
+  const cachedOnMount = useRef(isImageCached(src)).current;
+  const [loaded, setLoaded] = useState(cachedOnMount);
 
   const style: CSSProperties = {
     position: 'absolute',
@@ -41,13 +41,15 @@ function TileLogo({ logoPath, logoOnRight, isFocused, fadeOut = false }: {
     filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))',
     opacity: fadeOut ? 0 : loaded ? (isFocused ? 1 : 0.8) : 0,
     transform: loaded ? 'scale(1)' : 'scale(0.92)',
-    transition: `opacity ${theme.animation.trailerFadeMs}ms ease-out, transform 350ms ease-out`,
+    // Skip transition for cached images — appear instantly
+    transition: cachedOnMount
+      ? 'opacity 200ms ease-out'
+      : `opacity ${theme.animation.trailerFadeMs}ms ease-out, transform 350ms ease-out`,
   };
 
   return (
     <img
-      ref={imgRef}
-      src={getTmdbLogoUrl(logoPath, 'w300')}
+      src={src}
       alt=""
       style={style}
       onLoad={() => setLoaded(true)}
@@ -79,6 +81,13 @@ export const ContentTile = memo(function ContentTile({
   isRowFocused,
 }: ContentTileProps) {
   const dispatch = useDispatch();
+
+  // Track mounted tile count for Performance HUD
+  useEffect(() => {
+    tileCounter.mount();
+    return () => tileCounter.unmount();
+  }, []);
+
   const logoOnRight = tileIndex % 2 === 1;
   const lastNavAction = useSelector(selectLastNavAction);
   const trailerMuted = useSelector(selectTrailerMuted);
@@ -176,6 +185,7 @@ export const ContentTile = memo(function ContentTile({
                 dispatch(setTileTrailerPlaying(true));
                 dispatch(setActiveTrailer('tile'));
               }}
+              onEnded={() => setVideoPlaying(false)}
               onError={() => setVideoPlaying(false)}
               style={{
                 borderRadius: theme.tile.borderRadius,

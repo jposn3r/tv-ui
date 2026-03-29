@@ -87,6 +87,13 @@ export const HeroBanner = memo(function HeroBanner() {
     setVideoPlaying(false);
   }, []);
 
+  // Hide player when video ends so YouTube replay UI never shows
+  const handleEnded = useCallback(() => {
+    setShowVideo(false);
+    setVideoPlaying(false);
+    dispatch(setActiveTrailer(null));
+  }, [dispatch]);
+
   // Parallax: full height when heroFocused or navFocused, shrink only when in content rows
   const scrollRatio = (heroFocused || navFocused) ? 0 : Math.min((focus.rowIndex + 1) / 3, 1);
   const fullHeight = 56; // vh units
@@ -138,12 +145,17 @@ export const HeroBanner = memo(function HeroBanner() {
     zIndex: 2,
   };
 
+  // Dim text/buttons when trailer is actively playing so the video is more visible
+  const trailerIsLive = videoPlaying && videoVisible;
+
   const textContainerStyle: CSSProperties = {
     position: 'absolute',
     bottom: 60,
     left: theme.spacing.edgePadding,
     maxWidth: 500,
     zIndex: 3,
+    opacity: trailerIsLive ? 0.5 : 1,
+    transition: `opacity ${theme.animation.trailerFadeMs}ms ease-out`,
   };
 
   const titleStyle: CSSProperties = {
@@ -209,6 +221,7 @@ export const HeroBanner = memo(function HeroBanner() {
           muted={trailerMuted}
           autoplay={true}
           onPlaying={handlePlaying}
+          onEnded={handleEnded}
           onError={handleError}
           style={{
             zIndex: 1,

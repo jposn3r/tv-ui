@@ -146,7 +146,7 @@ export const SearchPage = memo(function SearchPage() {
         })}
       </div>
 
-      <div style={{ paddingTop: 20 }}>
+      <div style={{ paddingTop: 20, display: 'flex', flexDirection: 'column', gap: theme.spacing.rowGap }}>
         {query && results.length === 0 && (
           <div style={emptyStyle}>No results found for "{query}"</div>
         )}

@@ -47,15 +47,18 @@ Tracking remaining work for the TV UI project. Updated as we go.
 - [x] Logo fade-in animation on load (no flash, checks cached state)
 - [x] Row scroll fix — only scrolls on explicit Left/Right, never on vertical nav entry
 
-## Up Next
-
 ### Phase 2: Virtualized Rendering
-- [ ] VirtualList engine (vertical — only mount visible rows + 1 buffer each direction)
-- [ ] Horizontal virtualization within each row (only mount visible tiles + 1 buffer)
-- [ ] useVirtualization hook
-- [ ] Apply to Shell (vertical) and ContentRow (horizontal)
-- [ ] Component counter in Performance HUD showing mounted vs total
-- [ ] Verify: ~80 mounted components instead of 240+, memory stays flat
+- [x] Vertical virtualization — only ~7 rows render around focus (focused ± 3 buffer)
+- [x] Horizontal virtualization — only visible tiles + buffer per row, covers scroll animation range
+- [x] Deferred unmounting — rows/tiles stay mounted during scroll animations, removed only after off-screen
+- [x] Absolute row positioning — eliminates layout shift on mount/unmount (no spacer div drift)
+- [x] Dual-range scroll coverage — tile window spans both previous and current scroll positions during CSS transition
+- [x] Performance HUD — backtick toggles FPS counter + mounted tile count (~30-50 instead of ~240)
+- [x] Cached image detection — logos appear instantly on revisited pages (no re-fade animation)
+- [x] Hero trailer dims text/buttons 50% during playback, hides YouTube end-screen UI
+- [x] Search page row spacing fixed for consistency with content pages
+
+## Up Next
 
 ### Phase 3: Smooth Scroll Animations
 - [ ] ScrollEngine with requestAnimationFrame (replace CSS transitions)
@@ -71,14 +74,14 @@ Tracking remaining work for the TV UI project. Updated as we go.
 - [ ] Font system (system-ui stack, weight 400/500/600/700)
 - [ ] Detail overlay slide-up animation refinement
 
-### Phase 5: Performance HUD + Metrics
-- [ ] FPS counter (rAF-based frame timing)
-- [ ] Mounted component counter
+### Phase 5: Performance HUD + Metrics (Expand)
+- [x] FPS counter (rAF-based frame timing)
+- [x] Mounted component counter (tileCounter utility)
+- [x] PerformanceHUD component (toggle with backtick key, updates every 500ms)
 - [ ] Render time per frame (Performance API)
 - [ ] Memory usage tracking (performance.memory)
 - [ ] Input latency measurement (keydown → visual change)
 - [ ] Scroll smoothness (dropped frame detection)
-- [ ] PerformanceHUD component (toggle with dedicated key, updates every 500ms)
 - [ ] Performance API markers (focus-change, scroll-animation, row-mount)
 
 ### Phase 6: Final Polish + Documentation

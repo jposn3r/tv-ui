@@ -61,7 +61,6 @@ export function YouTubePlayer({
         enablejsapi: 1,
         fs: 0,
         iv_load_policy: 3, // hide annotations
-        loop: 1,
         modestbranding: 1,
         mute: muted ? 1 : 0,
         playsinline: 1,

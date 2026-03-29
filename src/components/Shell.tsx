@@ -1,4 +1,4 @@
-import { type CSSProperties, useRef, useEffect } from 'react';
+import { type CSSProperties, useRef, useEffect, useState, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { theme } from '../styles/theme';
 import { selectRows, selectFocus, selectActivePage, selectNavFocused, selectSearchResults, selectHeroFocused } from '../state/selectors';
@@ -8,7 +8,8 @@ import { DetailOverlay } from './DetailOverlay';
 import { NavBar } from './NavBar';
 import { SearchPage } from './SearchPage';
 import { MyListPage } from './MyListPage';
-import { KEYBOARD_GRID, KEYBOARD_COLS } from '../utils/constants';
+import { PerformanceHUD } from './PerformanceHUD';
+import { KEYBOARD_GRID, KEYBOARD_COLS, ROW_BUFFER } from '../utils/constants';
 
 const KEYBOARD_ROW_COUNT = Math.ceil(KEYBOARD_GRID.length / KEYBOARD_COLS);
 
@@ -30,6 +31,41 @@ export function Shell() {
       shellRef.current.scrollTop = 0;
     }
   }, [isSearch]);
+
+  // --- Vertical virtualization: deferred unmount ---
+  // Track the previous row window so rows stay mounted during scroll animation
+  const prevRangeRef = useRef<{ start: number; end: number }>({ start: 0, end: ROW_BUFFER + 2 });
+  const collapseTimerRef = useRef<number | null>(null);
+  const [deferredRange, setDeferredRange] = useState<{ start: number; end: number } | null>(null);
+
+  const scheduleCollapse = useCallback(() => {
+    if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    collapseTimerRef.current = window.setTimeout(() => {
+      setDeferredRange(null);
+    }, theme.animation.rowScrollDuration + 100); // wait for scroll animation + margin
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    };
+  }, []);
+
+  // Track focus changes and defer old row range removal until after scroll animation
+  const anchorRow = (!isSearch && !isMyList && (heroFocused || navFocused)) ? 0 : focus.rowIndex;
+  useEffect(() => {
+    if (isSearch || isMyList) return;
+    const newStart = Math.max(0, anchorRow - ROW_BUFFER);
+    const newEnd = Math.min(rows.length - 1, anchorRow + ROW_BUFFER + ((heroFocused || navFocused) ? 2 : 0));
+    const prev = prevRangeRef.current;
+
+    if (newStart !== prev.start || newEnd !== prev.end) {
+      // Keep old range alive during scroll animation
+      setDeferredRange(prev);
+      prevRangeRef.current = { start: newStart, end: newEnd };
+      scheduleCollapse();
+    }
+  }, [anchorRow, heroFocused, navFocused, rows.length, isSearch, isMyList, scheduleCollapse]);
 
   // Vertical scroll calculation
   const rowHeight = theme.tile.height + 40 + theme.spacing.rowGap;
@@ -89,14 +125,40 @@ export function Shell() {
       ) : (
         <div style={scrollContainerStyle}>
           <HeroBanner />
-          <div style={{ paddingTop: 20 }}>
-            {rows.map((row, i) => (
-              <ContentRow key={row.id} row={row} rowIndex={i} />
-            ))}
+          <div style={{ position: 'relative', height: rows.length * rowHeight, paddingTop: 20 }}>
+            {(() => {
+              // Vertical virtualization: render rows near focus
+              // Keep previous range mounted during scroll animation to prevent pop-out
+              const anchorRow = (heroFocused || navFocused) ? 0 : focus.rowIndex;
+              const newStart = Math.max(0, anchorRow - ROW_BUFFER);
+              const newEnd = Math.min(rows.length - 1, anchorRow + ROW_BUFFER + ((heroFocused || navFocused) ? 2 : 0));
+
+              // Merge with deferred (previous) range to cover both old and new positions
+              const startRow = deferredRange ? Math.min(newStart, deferredRange.start) : newStart;
+              const endRow = deferredRange ? Math.max(newEnd, deferredRange.end) : newEnd;
+
+              return rows.slice(startRow, endRow + 1).map((row, i) => {
+                const idx = startRow + i;
+                return (
+                  <div
+                    key={row.id}
+                    style={{
+                      position: 'absolute',
+                      top: idx * rowHeight,
+                      left: 0,
+                      right: 0,
+                    }}
+                  >
+                    <ContentRow row={row} rowIndex={idx} />
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
       )}
       <DetailOverlay />
+      <PerformanceHUD />
     </div>
   );
 }

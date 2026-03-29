@@ -43,6 +43,7 @@ Open `http://localhost:5173` in your browser.
 | WASD | Alternative directional nav (passes through as letters in search) |
 | M | Toggle mute on active trailer |
 | P | Toggle pause on active trailer |
+| ` (backtick) | Toggle Performance HUD (FPS + mounted tile count) |
 | Any letter/number | Direct typing in search mode |
 
 Mouse is intentionally disabled — TV apps don't have cursors.
@@ -54,6 +55,13 @@ Mouse is intentionally disabled — TV apps don't have cursors.
 - **Hero trailer** — The hero banner has focusable Play and Add to List buttons. While focused, the hero auto-plays a trailer after 2 seconds. Scroll down to content rows and it fades back to the static backdrop.
 - **One trailer at a time** — Tile trailers pause the hero; returning to hero stops the tile trailer.
 - **Global mute/pause** — M mutes whichever trailer is active. P pauses it. Detail overlay auto-pauses.
+
+### Virtualized Rendering
+- **Vertical virtualization** — Only ~7 rows render around the focused row (±3 buffer). Rows are absolutely positioned to eliminate layout shift on mount/unmount.
+- **Horizontal virtualization** — Only visible tiles + buffer rendered per row. The visible window covers both previous and current scroll positions during animation so no tiles pop in or out.
+- **Deferred unmounting** — Rows and tiles stay mounted during scroll animations and are removed only after they're fully off-screen.
+- **Performance HUD** — Press backtick to see live FPS and mounted tile count (~30-50 tiles instead of ~240).
+- **Image cache awareness** — Logos appear instantly on revisited pages with no re-fade animation.
 
 ### Navigation
 - **Hero focus stop** — Navigation flows Nav bar ↔ Hero buttons ↔ Content rows. The hero section stays full-height when moving between hero and nav.
@@ -71,14 +79,15 @@ src/
 ├── components/      # React UI layer
 │   ├── Shell        # App shell with per-page vertical scrolling
 │   ├── NavBar       # Top navigation (Home, TV Shows, Movies, New & Popular, My List, Search)
-│   ├── ContentRow   # Horizontal scrollable row with vertical overflow for trailer expansion
+│   ├── ContentRow   # Horizontally virtualized scrollable row
 │   ├── ContentTile  # Content card with trailer preview, logo fade-in, directional shrink
 │   ├── HeroBanner   # Featured content with trailer playback, parallax, focusable buttons
 │   ├── YouTubePlayer# Reusable YT.Player wrapper with lifecycle management
 │   ├── SearchPage   # On-screen keyboard grid + TMDB search results
 │   ├── MyListPage   # Empty state with focusable CTA
 │   ├── DetailOverlay# Expanded view on Enter
-│   └── FocusRing    # Scale + shadow focus indicator with trailer scale override
+│   ├── FocusRing    # Scale + shadow focus indicator with trailer scale override
+│   └── PerformanceHUD # FPS + mounted tile counter (backtick toggle)
 ├── hooks/           # React bridges to engines
 │   ├── useInputNavigation  # Wires FocusEngine + InputManager to Redux
 │   ├── useTrailerPreview   # Dwell timer → fetch trailer key → signal readiness
@@ -95,7 +104,8 @@ src/
 - **Engine/UI separation** — FocusEngine and InputManager have zero React dependencies. The rendering layer could be swapped for a custom renderer without touching navigation logic.
 - **Progressive data loading** — Content rows appear instantly with backdrops. Logo title treatments and trailer keys stream in asynchronously so the UI is never blocked.
 - **Trailer coordination via Redux** — A dedicated trailer slice tracks active trailer source, mute/pause state, and tile-vs-hero priority. Only one trailer plays at a time, and the detail overlay auto-pauses playback.
+- **Virtualization with deferred unmount** — Rows and tiles only render near the focus point. Previous scroll positions stay mounted during animations to prevent pop-in. Absolutely positioned rows eliminate layout shift entirely.
 
 ## Project Status
 
-Phase 1 (Focus Engine + Navigation), multi-page with search, and trailer previews (tile + hero) are complete. See [NEXTSTEPS.md](NEXTSTEPS.md) for remaining work including virtualization, scroll engine, styling system, performance HUD, and accessibility.
+Phases 1-2 complete: Focus Engine + Navigation, multi-page with search, trailer previews (tile + hero), and virtualized rendering with performance HUD. See [NEXTSTEPS.md](NEXTSTEPS.md) for remaining work including scroll engine, styling system, extended performance metrics, and accessibility.
