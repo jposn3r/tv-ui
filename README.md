@@ -75,7 +75,9 @@ Mouse is intentionally disabled — TV apps don't have cursors.
 src/
 ├── engine/          # Framework-agnostic core logic
 │   ├── FocusEngine  # 2D grid nav with row memory, nav bar support
-│   └── InputManager # Keyboard → abstract actions, raw key passthrough for search
+│   ├── InputManager # Keyboard → abstract actions, raw key passthrough for search
+│   ├── ScrollEngine # rAF-driven animation engine with mid-animation interruption
+│   └── easing       # easeOut, easeOutQuart/Quint, easeInOut, spring physics
 ├── components/      # React UI layer
 │   ├── Shell        # App shell with per-page vertical scrolling
 │   ├── NavBar       # Top navigation (Home, TV Shows, Movies, New & Popular, My List, Search)
@@ -91,16 +93,21 @@ src/
 ├── hooks/           # React bridges to engines
 │   ├── useInputNavigation  # Wires FocusEngine + InputManager to Redux
 │   ├── useTrailerPreview   # Dwell timer → fetch trailer key → signal readiness
+│   ├── useScrollAnimation  # React bridge to ScrollEngine
 │   └── useYouTubeApi       # Singleton YouTube IFrame API loader
 ├── state/           # Redux store, slices (focus, content, UI, trailer), selectors
 ├── data/            # TMDB integration (content, logos, trailers), per-page configs, mock fallback
-└── styles/          # JS-object theme tokens
+└── styles/
+    ├── theme          # Color palette, spacing, typography, animation tokens
+    ├── styleEngine    # createStyles() + mergeStyles() — Gibbon-inspired, no CSS cascade
+    └── componentStyles/ # Per-component style definitions (tile, hero, overlay, nav, etc.)
 ```
 
 **Key design decisions:**
 
 - **Custom focus engine over browser focus** — `tabIndex` and `:focus` are designed for mouse+keyboard web apps. TV UIs need 2D spatial navigation, focus memory across rows, and debounced input handling.
-- **No CSS framework** — TV apps don't use CSS cascade. Styles are explicit JS objects per component, similar to React Native's StyleSheet. This is predictable and GPU-friendly on constrained devices.
+- **No CSS framework** — TV apps don't use CSS cascade. A custom `styleEngine` defines frozen JS-object styles per component (like React Native's `StyleSheet.create`). No CSS cascade, no specificity issues — predictable and GPU-friendly.
+- **rAF scroll engine over CSS transitions** — CSS transitions can't be interrupted mid-animation without jank and are hard to coordinate with virtualization. A custom `ScrollEngine` driven by `requestAnimationFrame` gives frame-level control with easeOutQuint/Quart easing for smooth, uniform scroll behavior.
 - **Engine/UI separation** — FocusEngine and InputManager have zero React dependencies. The rendering layer could be swapped for a custom renderer without touching navigation logic.
 - **Progressive data loading** — Content rows appear instantly with backdrops. Logo title treatments and trailer keys stream in asynchronously so the UI is never blocked.
 - **Trailer coordination via Redux** — A dedicated trailer slice tracks active trailer source, mute/pause state, and tile-vs-hero priority. Only one trailer plays at a time, and the detail overlay auto-pauses playback.
@@ -108,4 +115,4 @@ src/
 
 ## Project Status
 
-Phases 1-2 complete: Focus Engine + Navigation, multi-page with search, trailer previews (tile + hero), and virtualized rendering with performance HUD. See [NEXTSTEPS.md](NEXTSTEPS.md) for remaining work including scroll engine, styling system, extended performance metrics, and accessibility.
+Phases 1-4 complete: Focus Engine + Navigation, multi-page with search, trailer previews, virtualized rendering, rAF scroll engine, and Gibbon-inspired styling system. See [NEXTSTEPS.md](NEXTSTEPS.md) for remaining work including extended performance metrics, accessibility, deployment, and demo video.

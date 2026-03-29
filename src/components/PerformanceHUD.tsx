@@ -1,10 +1,13 @@
-import { type CSSProperties, useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { tileCounter } from '../utils/tileCounter';
+import { scrollEngine } from '../engine/ScrollEngine';
+import { hudStyles } from '../styles/componentStyles/hudStyles';
 
 export function PerformanceHUD() {
   const [visible, setVisible] = useState(false);
   const [tileCount, setTileCount] = useState(0);
   const [fps, setFps] = useState(0);
+  const [animCount, setAnimCount] = useState(0);
   const frameTimesRef = useRef<number[]>([]);
   const rafRef = useRef<number>(0);
 
@@ -22,7 +25,6 @@ export function PerformanceHUD() {
   // FPS measurement via requestAnimationFrame
   const measureFrame = useCallback((now: number) => {
     frameTimesRef.current.push(now);
-    // Keep last 1 second of frame times
     const cutoff = now - 1000;
     frameTimesRef.current = frameTimesRef.current.filter((t) => t > cutoff);
     rafRef.current = requestAnimationFrame(measureFrame);
@@ -38,13 +40,12 @@ export function PerformanceHUD() {
   useEffect(() => {
     if (!visible) return;
 
-    // Initial tile count
     setTileCount(tileCounter.getCount());
-
     const unsubTiles = tileCounter.onChange(setTileCount);
 
     const interval = setInterval(() => {
       setFps(frameTimesRef.current.length);
+      setAnimCount(scrollEngine.getAnimationCount());
     }, 500);
 
     return () => {
@@ -55,27 +56,11 @@ export function PerformanceHUD() {
 
   if (!visible) return null;
 
-  const containerStyle: CSSProperties = {
-    position: 'fixed',
-    top: 12,
-    right: 12,
-    zIndex: 9999,
-    background: 'rgba(0, 0, 0, 0.85)',
-    border: '1px solid rgba(255, 255, 255, 0.15)',
-    borderRadius: 6,
-    padding: '10px 14px',
-    fontFamily: 'monospace',
-    fontSize: 12,
-    color: '#0f0',
-    lineHeight: 1.6,
-    pointerEvents: 'none',
-    minWidth: 160,
-  };
-
   return (
-    <div style={containerStyle}>
+    <div style={hudStyles.container}>
       <div>FPS: {fps}</div>
       <div>Tiles: {tileCount}</div>
+      <div>Anims: {animCount}</div>
     </div>
   );
 }

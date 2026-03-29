@@ -201,6 +201,27 @@ export const ContentTile = memo(function ContentTile({
               fadeOut={videoPlaying}
             />
           )}
+          {/* Mute hint — visible when trailer is playing */}
+          {videoPlaying && (
+            <div style={{
+              position: 'absolute',
+              bottom: 6,
+              right: 6,
+              padding: '3px 7px',
+              borderRadius: 3,
+              background: 'rgba(0,0,0,0.6)',
+              color: '#fff',
+              fontSize: 10,
+              fontWeight: 500,
+              opacity: 0.7,
+              pointerEvents: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}>
+              {trailerMuted ? '🔇' : '🔊'} M
+            </div>
+          )}
         </div>
       </FocusRing>
     </div>

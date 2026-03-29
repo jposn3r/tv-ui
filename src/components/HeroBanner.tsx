@@ -1,8 +1,11 @@
-import { type CSSProperties, memo, useState, useEffect, useRef, useCallback } from 'react';
+import { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { theme } from '../styles/theme';
 import { getHeroImageUrl } from '../data/mockContent';
 import { getTmdbBackdropUrl, getTmdbLogoUrl, fetchTrailerKey } from '../data/tmdb';
+import { heroStyles } from '../styles/componentStyles/heroStyles';
+import { useScrollAnimation } from '../hooks/useScrollAnimation';
+import { easeOutQuint } from '../engine/easing';
 import {
   selectFocus, selectRows, selectTrailerMuted, selectTrailerPaused,
   selectHeroFocused, selectHeroButtonIndex, selectTileTrailerPlaying, selectNavFocused,
@@ -94,8 +97,20 @@ export const HeroBanner = memo(function HeroBanner() {
     dispatch(setActiveTrailer(null));
   }, [dispatch]);
 
-  // Parallax: full height when heroFocused or navFocused, shrink only when in content rows
-  const scrollRatio = (heroFocused || navFocused) ? 0 : Math.min((focus.rowIndex + 1) / 3, 1);
+  // Parallax: animate scrollRatio via ScrollEngine
+  // Hero stays full on row 0, begins gentle shrink on row 1, fully shrunk by row 4
+  const targetScrollRatio = (heroFocused || navFocused || focus.rowIndex <= 0) ? 0 : Math.min((focus.rowIndex - 0.5) / 4, 1);
+  const parallax = useScrollAnimation('hero-parallax', 0);
+  const prevParallaxTarget = useRef(targetScrollRatio);
+
+  useEffect(() => {
+    if (prevParallaxTarget.current !== targetScrollRatio) {
+      prevParallaxTarget.current = targetScrollRatio;
+      parallax.animate(targetScrollRatio, 450, easeOutQuint);
+    }
+  }, [targetScrollRatio, parallax]);
+
+  const scrollRatio = parallax.value;
   const fullHeight = 56; // vh units
   const minHeight = 22; // vh units
   const bannerHeightVh = fullHeight - scrollRatio * (fullHeight - minHeight);
@@ -104,117 +119,18 @@ export const HeroBanner = memo(function HeroBanner() {
   // Hide video when banner is shrinking
   const videoVisible = showVideo && trailerKey && scrollRatio < 0.2;
 
-  const containerStyle: CSSProperties = {
-    position: 'relative',
-    width: '100%',
-    height: `${bannerHeightVh}vh`,
-    overflow: 'hidden',
-    transition: 'height 400ms ease-out, opacity 400ms ease-out',
-    opacity: bannerOpacity,
-    flexShrink: 0,
-  };
-
-  const imgStyle: CSSProperties = {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    display: 'block',
-    transition: `opacity ${theme.animation.trailerFadeMs}ms ease-out`,
-    opacity: videoPlaying && videoVisible ? 0 : 1,
-  };
-
-  const gradientOverlayStyle: CSSProperties = {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '60%',
-    background: theme.colors.gradientBottom,
-    pointerEvents: 'none',
-    zIndex: 2,
-  };
-
-  const leftGradientStyle: CSSProperties = {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    width: '50%',
-    background: theme.colors.gradientLeft,
-    pointerEvents: 'none',
-    zIndex: 2,
-  };
-
-  // Dim text/buttons when trailer is actively playing so the video is more visible
   const trailerIsLive = videoPlaying && videoVisible;
-
-  const textContainerStyle: CSSProperties = {
-    position: 'absolute',
-    bottom: 60,
-    left: theme.spacing.edgePadding,
-    maxWidth: 500,
-    zIndex: 3,
-    opacity: trailerIsLive ? 0.5 : 1,
-    transition: `opacity ${theme.animation.trailerFadeMs}ms ease-out`,
-  };
-
-  const titleStyle: CSSProperties = {
-    color: theme.colors.text,
-    fontSize: theme.typography.heroTitle.fontSize,
-    fontWeight: theme.typography.heroTitle.fontWeight,
-    marginBottom: 12,
-    textShadow: '0 2px 8px rgba(0,0,0,0.6)',
-  };
-
-  const synopsisStyle: CSSProperties = {
-    color: theme.colors.text,
-    fontSize: theme.typography.heroSynopsis.fontSize,
-    fontWeight: theme.typography.heroSynopsis.fontWeight,
-    lineHeight: theme.typography.heroSynopsis.lineHeight,
-    textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-    opacity: 0.9,
-    marginBottom: 20,
-  };
-
-  const buttonsRowStyle: CSSProperties = {
-    display: 'flex',
-    gap: 12,
-    opacity: heroFocused ? 1 : 0,
-    transition: 'opacity 300ms ease-out',
-  };
-
-  const muteIndicatorStyle: CSSProperties = {
-    position: 'absolute',
-    bottom: 16,
-    right: 24,
-    zIndex: 4,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '6px 12px',
-    borderRadius: 4,
-    background: 'rgba(0, 0, 0, 0.6)',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
-    color: theme.colors.text,
-    fontSize: 12,
-    fontWeight: 500,
-    opacity: videoVisible && videoPlaying ? 0.8 : 0,
-    transition: 'opacity 300ms ease-out',
-    pointerEvents: 'none',
-  };
 
   if (!firstTile) return null;
 
   return (
-    <div style={containerStyle}>
-      {/* Static backdrop */}
+    <div style={heroStyles.container(bannerHeightVh, bannerOpacity)}>
       <img
         src={firstTile.backdropPath ? getTmdbBackdropUrl(firstTile.backdropPath, 'w1280') : getHeroImageUrl()}
         alt="Featured content"
-        style={imgStyle}
+        style={heroStyles.backdrop(videoPlaying && videoVisible ? 0 : 1)}
       />
 
-      {/* YouTube trailer layer */}
       {videoVisible && (
         <YouTubePlayer
           videoKey={trailerKey!}
@@ -223,65 +139,35 @@ export const HeroBanner = memo(function HeroBanner() {
           onPlaying={handlePlaying}
           onEnded={handleEnded}
           onError={handleError}
-          style={{
-            zIndex: 1,
-            opacity: videoPlaying ? 1 : 0,
-            transition: `opacity ${theme.animation.trailerFadeMs}ms ease-out`,
-          }}
+          style={heroStyles.videoLayer(videoPlaying)}
         />
       )}
 
-      {/* Gradients on top of video */}
-      <div style={leftGradientStyle} />
-      <div style={gradientOverlayStyle} />
+      <div style={heroStyles.gradientLeft} />
+      <div style={heroStyles.gradientBottom} />
 
-      {/* Text/logo content */}
-      <div style={textContainerStyle}>
+      <div style={heroStyles.textContainer(trailerIsLive)}>
         {firstTile.logoPath ? (
           <img
             src={getTmdbLogoUrl(firstTile.logoPath)}
             alt={firstTile.title}
-            style={{
-              maxWidth: 350,
-              maxHeight: 120,
-              marginBottom: 16,
-              filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.6))',
-              display: 'block',
-            }}
+            style={heroStyles.logoImage}
           />
         ) : (
-          <div style={titleStyle}>{firstTile.title}</div>
+          <div style={heroStyles.title}>{firstTile.title}</div>
         )}
-        <div style={synopsisStyle}>{firstTile.synopsis}</div>
+        <div style={heroStyles.synopsis}>{firstTile.synopsis}</div>
 
-        {/* Hero buttons — Play & Add to List */}
-        <div style={buttonsRowStyle}>
-          {HERO_BUTTONS.map((label, i) => {
-            const isBtnFocused = heroFocused && i === heroButtonIndex;
-            const btnStyle: CSSProperties = {
-              padding: '12px 28px',
-              borderRadius: 4,
-              border: 'none',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'default',
-              color: isBtnFocused ? '#000' : theme.colors.text,
-              background: isBtnFocused ? '#fff' : 'rgba(255,255,255,0.2)',
-              transform: isBtnFocused ? 'scale(1.05)' : 'scale(1)',
-              transition: 'all 150ms ease-out',
-              letterSpacing: 0.5,
-            };
-            return (
-              <button key={label} style={btnStyle} tabIndex={-1}>
-                {label}
-              </button>
-            );
-          })}
+        <div style={heroStyles.buttonsRow(heroFocused)}>
+          {HERO_BUTTONS.map((label, i) => (
+            <button key={label} style={heroStyles.heroButton(heroFocused && i === heroButtonIndex)} tabIndex={-1}>
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Mute indicator */}
-      <div style={muteIndicatorStyle}>
+      <div style={heroStyles.muteIndicator(!!videoVisible && videoPlaying)}>
         {trailerMuted ? '🔇' : '🔊'} Press M
       </div>
     </div>

@@ -20,6 +20,10 @@ export const theme = {
   typography: {
     fontFamily:
       "'Helvetica Neue', Helvetica, Arial, system-ui, -apple-system, sans-serif",
+    fontWeightRegular: 400,
+    fontWeightMedium: 500,
+    fontWeightSemibold: 600,
+    fontWeightBold: 700,
     rowTitle: { fontSize: 18, fontWeight: 600, letterSpacing: 0.5 },
     tileTitle: { fontSize: 13, fontWeight: 500 },
     tileMetadata: { fontSize: 11, fontWeight: 400 },
@@ -36,6 +40,8 @@ export const theme = {
     trailerFadeMs: 500,
     trailerScale: 1.15,
     heroTrailerDelayMs: 1500,
+    springStiffness: 300,
+    springDamping: 26,
   },
   tile: {
     width: 230,

@@ -58,26 +58,31 @@ Tracking remaining work for the TV UI project. Updated as we go.
 - [x] Hero trailer dims text/buttons 50% during playback, hides YouTube end-screen UI
 - [x] Search page row spacing fixed for consistency with content pages
 
-## Up Next
-
 ### Phase 3: Smooth Scroll Animations
-- [ ] ScrollEngine with requestAnimationFrame (replace CSS transitions)
-- [ ] Cubic-bezier easing, optional spring physics
-- [ ] Row scroll: focused tile stays ~2nd from left edge (Netflix pattern)
-- [ ] Vertical scroll: focused row near top, not centered
-- [ ] Hero banner parallax via rAF (not CSS transition)
-- [ ] Coordinate scroll position with virtualization mount/unmount cycle
+- [x] ScrollEngine — rAF-driven animation engine replacing all CSS transitions
+- [x] Easing library: easeOut, easeOutQuart, easeOutQuint, easeInOut, easeInOutQuint, spring physics
+- [x] useScrollAnimation hook — React bridge with mid-animation interruption support
+- [x] Vertical scroll: easeOutQuint over 450ms, hero pinned outside scroll container
+- [x] Horizontal scroll: easeOutQuart over 350ms, virtualization coordinated via onComplete
+- [x] Hero parallax: rAF-driven height/opacity interpolation, fixed-height clip container
+- [x] Deferred unmount now driven by ScrollEngine onComplete (no setTimeout)
+- [x] PerformanceHUD shows active animation count
 
 ### Phase 4: Styling System + Visual Polish
-- [ ] styleEngine.ts — JS-object styles, no CSS cascade (Gibbon-inspired)
-- [ ] Apply to all components, remove inline style objects
-- [ ] Font system (system-ui stack, weight 400/500/600/700)
-- [ ] Detail overlay slide-up animation refinement
+- [x] styleEngine.ts — createStyles() (frozen like React Native StyleSheet) + mergeStyles()
+- [x] 7 component style files in styles/componentStyles/ (tile, hero, overlay, shell, row, nav, focusRing, hud, rowTitle)
+- [x] All major components migrated to centralized style imports
+- [x] Font weight constants (400/500/600/700) added to theme
+- [x] DetailOverlay slide-up animation fixed — rAF-driven via ScrollEngine (was missing CSS keyframe)
+- [x] Mute hint indicator on tile trailers
+
+## Up Next
 
 ### Phase 5: Performance HUD + Metrics (Expand)
 - [x] FPS counter (rAF-based frame timing)
 - [x] Mounted component counter (tileCounter utility)
 - [x] PerformanceHUD component (toggle with backtick key, updates every 500ms)
+- [x] Active animation counter
 - [ ] Render time per frame (Performance API)
 - [ ] Memory usage tracking (performance.memory)
 - [ ] Input latency measurement (keydown → visual change)
@@ -92,7 +97,8 @@ Tracking remaining work for the TV UI project. Updated as we go.
 - [ ] Record 60-second demo video
 
 ## Known Issues
-- None currently tracked
+- Vertical scroll between rows 0-1 may need further tuning (hero parallax interaction)
+- Tile trailer playback timing may need polish after ScrollEngine migration
 
 ## Notes
 - Project plan PDF in repo root has full phase details with code snippets
