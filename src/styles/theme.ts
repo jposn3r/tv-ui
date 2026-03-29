@@ -32,6 +32,10 @@ export const theme = {
     focusDuration: 200,
     scrollDuration: 300,
     rowScrollDuration: 400,
+    trailerDwellMs: 2000,
+    trailerFadeMs: 500,
+    trailerScale: 1.15,
+    heroTrailerDelayMs: 1500,
   },
   tile: {
     width: 230,

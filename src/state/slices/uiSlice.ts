@@ -7,6 +7,8 @@ interface UIState {
   activePage: PageId;
   navFocused: boolean;
   navIndex: number;
+  heroFocused: boolean;
+  heroButtonIndex: number;
   detailOverlay: {
     open: boolean;
     tile: TileData | null;
@@ -20,6 +22,8 @@ const initialState: UIState = {
   activePage: 'home',
   navFocused: false,
   navIndex: 0,
+  heroFocused: false,
+  heroButtonIndex: 0,
   detailOverlay: {
     open: false,
     tile: null,
@@ -71,6 +75,15 @@ export const uiSlice = createSlice({
     clearSearchQuery(state) {
       state.searchQuery = '';
     },
+    setHeroFocused(state, action: PayloadAction<boolean>) {
+      state.heroFocused = action.payload;
+      if (action.payload) {
+        state.heroButtonIndex = 0;
+      }
+    },
+    setHeroButtonIndex(state, action: PayloadAction<number>) {
+      state.heroButtonIndex = action.payload;
+    },
   },
 });
 
@@ -78,5 +91,6 @@ export const {
   openDetail, closeDetail, setDetailButtonIndex, togglePerfHud,
   setActivePage, setNavFocused, setNavIndex,
   setSearchQuery, appendSearchChar, deleteSearchChar, clearSearchQuery,
+  setHeroFocused, setHeroButtonIndex,
 } = uiSlice.actions;
 export default uiSlice.reducer;

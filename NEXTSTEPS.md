@@ -29,20 +29,25 @@ Tracking remaining work for the TV UI project. Updated as we go.
 - [x] My List empty state with focusable "Browse Content" CTA
 - [x] FocusEngine extended: nav row (rowIndex -1), navRestoreIndex, nav item count
 
+### Trailer Previews
+- [x] YouTube IFrame Player API integration (singleton loader, reusable YouTubePlayer component)
+- [x] TMDB videos endpoint — fetches YouTube trailer keys with priority (official trailer > trailer > teaser)
+- [x] Trailer key caching with 60s TTL on null entries for retry
+- [x] Tile trailer: 2-second dwell timer, tile expands to 16:9 aspect ratio, smooth crossfade
+- [x] Backdrop image + logo fade out together as video fades in (no loading spinner visible)
+- [x] Directional shrink-back animation (transform-origin based on nav direction)
+- [x] Hero trailer: plays when hero buttons are focused, stops on scroll to rows or nav
+- [x] Hero section: taller (56vh), focusable Play + Add to List buttons
+- [x] Navigation flow: Nav ↔ Hero buttons ↔ Content rows (hero is a focus stop)
+- [x] Hero stays full height when navigating to nav bar (no animation on hero ↔ nav)
+- [x] Only one trailer at a time — tile playing pauses hero, returning to hero stops tile
+- [x] Global mute (M key) — toggles mute on whichever trailer is active
+- [x] Global pause (P key) — pauses current trailer, auto-clears on navigation
+- [x] Detail overlay pauses active trailer, unpauses on close
+- [x] Logo fade-in animation on load (no flash, checks cached state)
+- [x] Row scroll fix — only scrolls on explicit Left/Right, never on vertical nav entry
+
 ## Up Next
-
-### Tile Trailer Previews (Priority)
-- [ ] 2-second focus dwell timer on tiles triggers trailer playback
-- [ ] Tile grows by 20% when trailer starts playing
-- [ ] Video element mount/unmount and loading states
-- [ ] Elegant shrink-back animation when navigating away
-- [ ] Horizontal/vertical shrink direction based on navigation action
-
-### Hero Trailers (Priority)
-- [ ] Auto-playing trailer in hero banner for each page
-- [ ] Mute/unmute toggle button (easy to find with focus)
-- [ ] Trailer fetched from TMDB videos endpoint
-- [ ] Graceful fallback to static backdrop when no trailer available
 
 ### Phase 2: Virtualized Rendering
 - [ ] VirtualList engine (vertical — only mount visible rows + 1 buffer each direction)
@@ -64,7 +69,6 @@ Tracking remaining work for the TV UI project. Updated as we go.
 - [ ] styleEngine.ts — JS-object styles, no CSS cascade (Gibbon-inspired)
 - [ ] Apply to all components, remove inline style objects
 - [ ] Font system (system-ui stack, weight 400/500/600/700)
-- [ ] Tile metadata visibility polish
 - [ ] Detail overlay slide-up animation refinement
 
 ### Phase 5: Performance HUD + Metrics
@@ -74,7 +78,7 @@ Tracking remaining work for the TV UI project. Updated as we go.
 - [ ] Memory usage tracking (performance.memory)
 - [ ] Input latency measurement (keydown → visual change)
 - [ ] Scroll smoothness (dropped frame detection)
-- [ ] PerformanceHUD component (toggle with 'P' key, updates every 500ms)
+- [ ] PerformanceHUD component (toggle with dedicated key, updates every 500ms)
 - [ ] Performance API markers (focus-change, scroll-animation, row-mount)
 
 ### Phase 6: Final Polish + Documentation

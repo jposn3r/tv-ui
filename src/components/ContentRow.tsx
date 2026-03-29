@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import { theme } from '../styles/theme';
 import { ContentTile } from './ContentTile';
 import { RowTitle } from './RowTitle';
-import { selectFocus } from '../state/selectors';
+import { selectFocus, selectHeroFocused, selectNavFocused, selectLastNavAction } from '../state/selectors';
 import type { RowData } from '../state/slices/contentSlice';
 
 interface ContentRowProps {
@@ -16,16 +16,20 @@ export const ContentRow = memo(function ContentRow({
   rowIndex,
 }: ContentRowProps) {
   const focus = useSelector(selectFocus);
-  const isRowFocused = focus.rowIndex === rowIndex;
+  const heroFocused = useSelector(selectHeroFocused);
+  const navFocused = useSelector(selectNavFocused);
+  const lastNavAction = useSelector(selectLastNavAction);
+  // Row is only truly focused when it has focus AND neither hero nor nav is focused
+  const isRowFocused = focus.rowIndex === rowIndex && !heroFocused && !navFocused;
   const lastTileIndexRef = useRef(0);
   const scrollOffsetRef = useRef(0);
 
   if (isRowFocused) {
-    const prevTile = lastTileIndexRef.current;
     const currTile = focus.tileIndex;
+    const isHorizontalMove = lastNavAction === 'LEFT' || lastNavAction === 'RIGHT';
 
-    // Only update scroll when the user moves Left/Right within this row
-    if (currTile !== prevTile) {
+    // Only scroll when the user explicitly presses Left/Right — never on vertical nav
+    if (isHorizontalMove && currTile !== lastTileIndexRef.current) {
       scrollOffsetRef.current =
         Math.max(0, currTile - 1) *
         (theme.tile.width + theme.spacing.tileGap);
@@ -53,7 +57,13 @@ export const ContentRow = memo(function ContentRow({
   return (
     <div style={rowContainerStyle} role="row" aria-label={row.title}>
       <RowTitle title={row.title} isRowFocused={isRowFocused} />
-      <div style={{ overflow: 'hidden' }}>
+      <div style={{
+        overflow: 'hidden',
+        paddingTop: 40,
+        paddingBottom: 40,
+        marginTop: -40,
+        marginBottom: -40,
+      }}>
         <div style={tilesWrapperStyle}>
           {row.tiles.map((tile, tileIndex) => (
             <ContentTile

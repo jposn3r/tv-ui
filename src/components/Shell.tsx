@@ -1,7 +1,7 @@
 import { type CSSProperties, useRef, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { theme } from '../styles/theme';
-import { selectRows, selectFocus, selectActivePage, selectNavFocused, selectSearchResults } from '../state/selectors';
+import { selectRows, selectFocus, selectActivePage, selectNavFocused, selectSearchResults, selectHeroFocused } from '../state/selectors';
 import { ContentRow } from './ContentRow';
 import { HeroBanner } from './HeroBanner';
 import { DetailOverlay } from './DetailOverlay';
@@ -17,6 +17,7 @@ export function Shell() {
   const focus = useSelector(selectFocus);
   const activePage = useSelector(selectActivePage);
   const navFocused = useSelector(selectNavFocused);
+  const heroFocused = useSelector(selectHeroFocused);
   const searchResults = useSelector(selectSearchResults);
   const shellRef = useRef<HTMLDivElement>(null);
 
@@ -50,8 +51,15 @@ export function Shell() {
       verticalOffset = resultsTop - (rowHeight * 1.5) + Math.max(0, resultIdx) * rowHeight;
       verticalOffset = Math.max(0, verticalOffset);
     }
-  } else if (!isSearch && !isMyList && focus.rowIndex >= 0) {
-    verticalOffset = Math.max(0, focus.rowIndex - 1) * rowHeight;
+  } else if (!isSearch && !isMyList && !heroFocused && focus.rowIndex >= 0) {
+    // When scrolling into content rows, offset accounts for the hero banner
+    // Row 0: scroll just enough to bring the first row into good view below the hero
+    // Row 1+: standard offset with previous row peeking
+    if (focus.rowIndex === 0) {
+      verticalOffset = 0; // Hero still visible but shrinking via its own height calc
+    } else {
+      verticalOffset = Math.max(0, focus.rowIndex - 1) * rowHeight;
+    }
   }
 
   const shellStyle: CSSProperties = {

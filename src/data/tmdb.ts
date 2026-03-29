@@ -253,6 +253,73 @@ export async function searchTmdb(query: string): Promise<RowData[]> {
   }
 }
 
+// --- Trailer key cache ---
+interface CacheEntry {
+  key: string | null;
+  ts: number;
+}
+const trailerCache = new Map<string, CacheEntry>();
+const NULL_TTL_MS = 60_000; // retry null entries after 60s
+
+interface TmdbVideoResult {
+  key: string;
+  site: string;
+  type: string;
+  official: boolean;
+  name: string;
+}
+
+interface TmdbVideosResponse {
+  results: TmdbVideoResult[];
+}
+
+/**
+ * Fetch a YouTube trailer key for a given TMDB title.
+ * Prefers official trailers, then teasers, then any YouTube video.
+ * Results are cached; null entries expire after 60s.
+ */
+export async function fetchTrailerKey(
+  tmdbId: number,
+  mediaType: 'movie' | 'tv'
+): Promise<string | null> {
+  const cacheKey = `${mediaType}-${tmdbId}`;
+  const cached = trailerCache.get(cacheKey);
+  if (cached) {
+    // Non-null entries never expire; null entries expire after TTL
+    if (cached.key !== null || Date.now() - cached.ts < NULL_TTL_MS) {
+      return cached.key;
+    }
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.themoviedb.org/3/${mediaType}/${tmdbId}/videos`,
+      { headers }
+    );
+    if (!res.ok) {
+      trailerCache.set(cacheKey, { key: null, ts: Date.now() });
+      return null;
+    }
+    const data: TmdbVideosResponse = await res.json();
+    const ytVideos = data.results.filter((v) => v.site === 'YouTube');
+
+    // Priority: official trailer > any trailer > teaser > any video
+    const pick =
+      ytVideos.find((v) => v.type === 'Trailer' && v.official) ??
+      ytVideos.find((v) => v.type === 'Trailer') ??
+      ytVideos.find((v) => v.type === 'Teaser') ??
+      ytVideos[0] ??
+      null;
+
+    const key = pick?.key ?? null;
+    trailerCache.set(cacheKey, { key, ts: Date.now() });
+    return key;
+  } catch {
+    trailerCache.set(cacheKey, { key: null, ts: Date.now() });
+    return null;
+  }
+}
+
 /**
  * Fetch the English logo image for a given title.
  * Returns the logo path or null if none found.

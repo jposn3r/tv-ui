@@ -3,6 +3,7 @@ export const ROW_BUFFER = 1;
 export const VISIBLE_TILES = 6;
 export const TILE_BUFFER = 1;
 export const DETAIL_BUTTON_COUNT = 3;
+export const HERO_BUTTON_COUNT = 2; // Play, Add to List
 
 // On-screen keyboard grid for search — every row has KEYBOARD_COLS items
 export const KEYBOARD_COLS = 7;

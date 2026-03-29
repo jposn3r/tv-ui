@@ -16,3 +16,11 @@ export const selectFocusedTile = (state: RootState) => {
   const row = state.content.rows[rowIndex];
   return row?.tiles[tileIndex] ?? null;
 };
+
+export const selectTrailerMuted = (state: RootState) => state.trailer.trailerMuted;
+export const selectTrailerPaused = (state: RootState) => state.trailer.trailerPaused;
+export const selectLastNavAction = (state: RootState) => state.trailer.lastNavAction;
+export const selectActiveTrailer = (state: RootState) => state.trailer.activeTrailer;
+export const selectTileTrailerPlaying = (state: RootState) => state.trailer.tileTrailerPlaying;
+export const selectHeroFocused = (state: RootState) => state.ui.heroFocused;
+export const selectHeroButtonIndex = (state: RootState) => state.ui.heroButtonIndex;

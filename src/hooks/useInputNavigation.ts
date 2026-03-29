@@ -13,6 +13,8 @@ import {
   appendSearchChar,
   deleteSearchChar,
   clearSearchQuery,
+  setHeroFocused,
+  setHeroButtonIndex,
 } from '../state/slices/uiSlice';
 import {
   setContent,
@@ -20,6 +22,7 @@ import {
   switchPage,
   setSearchResults,
 } from '../state/slices/contentSlice';
+import { setLastNavAction, toggleTrailerMute, toggleTrailerPaused, setTrailerPaused, setTileTrailerPlaying, setActiveTrailer } from '../state/slices/trailerSlice';
 import {
   selectRows,
   selectDetailOverlay,
@@ -29,8 +32,10 @@ import {
   selectSearchQuery,
   selectSearchResults,
   selectPageCache,
+  selectHeroFocused,
+  selectHeroButtonIndex,
 } from '../state/selectors';
-import { DETAIL_BUTTON_COUNT, KEYBOARD_GRID, KEYBOARD_COLS } from '../utils/constants';
+import { DETAIL_BUTTON_COUNT, HERO_BUTTON_COUNT, KEYBOARD_GRID, KEYBOARD_COLS } from '../utils/constants';
 import { NAV_ITEMS } from '../data/pageConfigs';
 import { PAGE_CONFIGS } from '../data/pageConfigs';
 import { fetchRowsFromConfigs, fetchLogosProgressive, searchTmdb } from '../data/tmdb';
@@ -60,6 +65,9 @@ export function useInputNavigation() {
   const searchResults = useSelector(selectSearchResults);
   const pageCache = useSelector(selectPageCache);
 
+  const heroFocused = useSelector(selectHeroFocused);
+  const heroButtonIndex = useSelector(selectHeroButtonIndex);
+
   const overlayRef = useRef(overlay);
   overlayRef.current = overlay;
   const activePageRef = useRef(activePage);
@@ -68,6 +76,10 @@ export function useInputNavigation() {
   navFocusedRef.current = navFocused;
   const navIndexRef = useRef(navIndex);
   navIndexRef.current = navIndex;
+  const heroFocusedRef = useRef(heroFocused);
+  heroFocusedRef.current = heroFocused;
+  const heroButtonIndexRef = useRef(heroButtonIndex);
+  heroButtonIndexRef.current = heroButtonIndex;
   const searchQueryRef = useRef(searchQuery);
   searchQueryRef.current = searchQuery;
   const pageCacheRef = useRef(pageCache);
@@ -164,9 +176,40 @@ export function useInputNavigation() {
       engine.setRows(
         rowsRef.current.map((r) => ({ id: r.id, tileCount: r.tiles.length }))
       );
+      // Start on hero for content pages
+      dispatch(setHeroFocused(true));
     }
 
-    engine.onFocusChange((_prev, next) => {
+    engine.onFocusChange((prev, next, action) => {
+      // Track nav direction for directional shrink animations
+      if (action === 'UP' || action === 'DOWN' || action === 'LEFT' || action === 'RIGHT') {
+        dispatch(setLastNavAction(action));
+        // Clear pause on any navigation so new tiles can auto-play
+        dispatch(setTrailerPaused(false));
+      }
+
+      const page = activePageRef.current;
+      const isContentPage = page !== 'search' && page !== 'myList';
+
+      // Intercept: nav → row 0 on content pages → land on hero instead
+      if (isContentPage && prev.rowIndex === -1 && next.rowIndex === 0 && action === 'DOWN') {
+        engine.setPosition(prev); // revert engine position
+        dispatch(setNavFocused(false));
+        dispatch(setHeroFocused(true));
+        dispatch(setTileTrailerPlaying(false));
+        dispatch(setActiveTrailer(null));
+        return;
+      }
+
+      // Intercept: row 0 → nav on content pages → land on hero instead
+      if (isContentPage && prev.rowIndex === 0 && next.rowIndex === -1 && action === 'UP') {
+        engine.setPosition(prev); // revert engine position
+        dispatch(setHeroFocused(true));
+        dispatch(setTileTrailerPlaying(false));
+        dispatch(setActiveTrailer(null));
+        return;
+      }
+
       if (next.rowIndex === -1) {
         dispatch(setNavFocused(true));
         dispatch(setNavIndex(next.tileIndex));
@@ -192,10 +235,19 @@ export function useInputNavigation() {
             dispatch(setSearchResults([]));
             dispatch(clearSearchQuery());
           }
-          // Move focus down to content and update engine rows for new page
           dispatch(setNavFocused(false));
-          dispatch(setFocus({ rowIndex: 0, tileIndex: 0 }));
-          engine.setPosition({ rowIndex: 0, tileIndex: 0 });
+          dispatch(setHeroFocused(false));
+
+          // Content pages: land on hero. Other pages: land on row 0.
+          const isContentPage = navItem.id !== 'search' && navItem.id !== 'myList';
+          if (isContentPage) {
+            dispatch(setHeroFocused(true));
+            // Keep engine at row 0 so DOWN from hero moves to row 0
+            engine.setPosition({ rowIndex: 0, tileIndex: 0 });
+          } else {
+            dispatch(setFocus({ rowIndex: 0, tileIndex: 0 }));
+            engine.setPosition({ rowIndex: 0, tileIndex: 0 });
+          }
 
           if (navItem.id === 'search') {
             engine.setRows(buildKeyboardRows(), true);
@@ -259,7 +311,7 @@ export function useInputNavigation() {
         const resultRowIdx = pos.rowIndex - KEYBOARD_ROW_COUNT;
         const resultRow = searchResultsRef.current[resultRowIdx];
         const tile = resultRow?.tiles[pos.tileIndex];
-        if (tile) dispatch(openDetail(tile));
+        if (tile) { dispatch(openDetail(tile)); dispatch(setTrailerPaused(true)); }
         return;
       }
 
@@ -277,12 +329,12 @@ export function useInputNavigation() {
       const currentRows = rowsRef.current;
       const row = currentRows[pos.rowIndex];
       const tile = row?.tiles[pos.tileIndex];
-      if (tile) dispatch(openDetail(tile));
+      if (tile) { dispatch(openDetail(tile)); dispatch(setTrailerPaused(true)); }
     });
 
     engine.onBack(() => {
       if (overlayRef.current.open) {
-        dispatch(closeDetail());
+        dispatch(closeDetail()); dispatch(setTrailerPaused(false));
       }
     });
 
@@ -294,9 +346,45 @@ export function useInputNavigation() {
         } else if (action === 'RIGHT') {
           dispatch(setDetailButtonIndex(Math.min(DETAIL_BUTTON_COUNT - 1, ov.buttonIndex + 1)));
         } else if (action === 'BACK') {
-          dispatch(closeDetail());
+          dispatch(closeDetail()); dispatch(setTrailerPaused(false));
         }
         return;
+      }
+
+      // Hero focused — handle navigation between hero buttons
+      if (heroFocusedRef.current) {
+        const page = activePageRef.current;
+        const isContentPage = page !== 'search' && page !== 'myList';
+        if (isContentPage) {
+          if (action === 'LEFT') {
+            dispatch(setHeroButtonIndex(Math.max(0, heroButtonIndexRef.current - 1)));
+          } else if (action === 'RIGHT') {
+            dispatch(setHeroButtonIndex(Math.min(HERO_BUTTON_COUNT - 1, heroButtonIndexRef.current + 1)));
+          } else if (action === 'DOWN') {
+            // Leave hero → go to first content row
+            dispatch(setHeroFocused(false));
+            dispatch(setFocus({ rowIndex: 0, tileIndex: 0 }));
+            engine.setPosition({ rowIndex: 0, tileIndex: 0 });
+          } else if (action === 'UP') {
+            // Leave hero → go to nav
+            dispatch(setHeroFocused(false));
+            dispatch(setNavFocused(true));
+            dispatch(setNavIndex(engine.getPosition().rowIndex === -1 ? engine.getPosition().tileIndex : 0));
+            const navIdx = NAV_ITEMS.findIndex((n) => n.id === activePageRef.current);
+            dispatch(setNavIndex(navIdx >= 0 ? navIdx : 0));
+            engine.setPosition({ rowIndex: -1, tileIndex: navIdx >= 0 ? navIdx : 0 });
+          } else if (action === 'SELECT') {
+            // Hero button pressed — no-op for now (Play / Add to List)
+          } else if (action === 'BACK') {
+            // Leave hero → go to nav
+            dispatch(setHeroFocused(false));
+            dispatch(setNavFocused(true));
+            const navIdx = NAV_ITEMS.findIndex((n) => n.id === activePageRef.current);
+            dispatch(setNavIndex(navIdx >= 0 ? navIdx : 0));
+            engine.setPosition({ rowIndex: -1, tileIndex: navIdx >= 0 ? navIdx : 0 });
+          }
+          return;
+        }
       }
 
       engine.navigate(action);
@@ -317,8 +405,19 @@ export function useInputNavigation() {
       });
     }
 
+    // Global M key for mute, P key for pause
+    const handleGlobalKeys = (e: KeyboardEvent) => {
+      if (e.key === 'm' || e.key === 'M') {
+        dispatch(toggleTrailerMute());
+      } else if (e.key === 'p' || e.key === 'P') {
+        dispatch(toggleTrailerPaused());
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeys);
+
     return () => {
       input.dispose();
+      window.removeEventListener('keydown', handleGlobalKeys);
       if (searchTimerRef.current) {
         clearTimeout(searchTimerRef.current);
       }
