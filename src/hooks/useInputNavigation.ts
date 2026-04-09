@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
+import type { RootState } from '../state/store';
 import { FocusEngine } from '../engine/FocusEngine';
 import { InputManager } from '../engine/InputManager';
 import { setFocus } from '../state/slices/focusSlice';
@@ -23,6 +24,8 @@ import {
   setSearchResults,
 } from '../state/slices/contentSlice';
 import { setLastNavAction, toggleTrailerMute, toggleTrailerPaused, setTrailerPaused, setTileTrailerPlaying, setActiveTrailer } from '../state/slices/trailerSlice';
+import { toggleWatchlist, clearWatchlist } from '../state/slices/watchlistSlice';
+import { clearAllAppData } from '../state/persistence';
 import {
   selectRows,
   selectDetailOverlay,
@@ -34,6 +37,7 @@ import {
   selectPageCache,
   selectHeroFocused,
   selectHeroButtonIndex,
+  selectWatchlist,
 } from '../state/selectors';
 import { DETAIL_BUTTON_COUNT, HERO_BUTTON_COUNT, KEYBOARD_GRID, KEYBOARD_COLS } from '../utils/constants';
 import { NAV_ITEMS } from '../data/pageConfigs';
@@ -56,6 +60,7 @@ function buildKeyboardRows() {
 
 export function useInputNavigation() {
   const dispatch = useDispatch();
+  const store = useStore<RootState>();
   const rows = useSelector(selectRows);
   const overlay = useSelector(selectDetailOverlay);
   const activePage = useSelector(selectActivePage);
@@ -67,6 +72,29 @@ export function useInputNavigation() {
 
   const heroFocused = useSelector(selectHeroFocused);
   const heroButtonIndex = useSelector(selectHeroButtonIndex);
+  const watchlist = useSelector(selectWatchlist);
+
+  const watchlistRef = useRef(watchlist);
+  watchlistRef.current = watchlist;
+
+  // Build engine row descriptors for the My List page
+  const buildMyListRows = useCallback(() => {
+    const items = store.getState().watchlist.items;
+    const row0 = items.length > 0
+      ? { id: 'mylist-items', tileCount: items.length }
+      : { id: 'mylist-cta', tileCount: 1 };
+    return [row0, { id: 'mylist-clear', tileCount: 1 }];
+  }, [store]);
+
+  // Build engine row descriptors for a content page from current store state.
+  // Always reads fresh from the store — never from a render-stale ref —
+  // so navigation right after a page switch always sees the correct row shape.
+  const buildContentRowsForPage = useCallback((pageId: PageId): Array<{id:string;tileCount:number}> => {
+    const state = store.getState();
+    const cached = state.content.pages[pageId];
+    const rows = cached && cached.length > 0 ? cached : state.content.rows;
+    return rows.map((r) => ({ id: r.id, tileCount: r.tiles.length }));
+  }, [store]);
 
   const overlayRef = useRef(overlay);
   overlayRef.current = overlay;
@@ -171,11 +199,9 @@ export function useInputNavigation() {
       engine.setRows(buildKeyboardRows(), true);
       engine.setRowMemoryEnabled(false);
     } else if (activePageRef.current === 'myList') {
-      engine.setRows([{ id: 'mylist-cta', tileCount: 1 }], true);
+      engine.setRows(buildMyListRows(), true);
     } else {
-      engine.setRows(
-        rowsRef.current.map((r) => ({ id: r.id, tileCount: r.tiles.length }))
-      );
+      engine.setRows(buildContentRowsForPage(activePageRef.current));
       // Start on hero for content pages
       dispatch(setHeroFocused(true));
     }
@@ -264,15 +290,13 @@ export function useInputNavigation() {
               }
             });
           } else if (navItem.id === 'myList') {
-            engine.setRows([{ id: 'mylist-cta', tileCount: 1 }], true);
+            engine.setRows(buildMyListRows(), true);
             engine.setRowMemoryEnabled(true);
             input.setRawKeyCallback(null);
           } else {
-            // Clear row memory when switching pages, content rows set by sync effect
-            engine.setRows(
-              rowsRef.current.map((r) => ({ id: r.id, tileCount: r.tiles.length })),
-              true
-            );
+            // Read row shape directly from the store (never from render-stale refs)
+            // so the engine has correct row counts immediately after page switch.
+            engine.setRows(buildContentRowsForPage(navItem.id), true);
             engine.setRowMemoryEnabled(true);
             input.setRawKeyCallback(null);
           }
@@ -315,8 +339,22 @@ export function useInputNavigation() {
         return;
       }
 
-      // My List "Browse Content" button
-      if (activePageRef.current === 'myList' && pos.rowIndex === 0) {
+      // My List page
+      if (activePageRef.current === 'myList') {
+        // Row 1 = Clear All Saved Data button
+        if (pos.rowIndex === 1) {
+          dispatch(clearWatchlist());
+          clearAllAppData();
+          return;
+        }
+        // Row 0: tiles (if list non-empty) or Browse CTA (if empty)
+        const items = watchlistRef.current;
+        if (items.length > 0) {
+          const tile = items[pos.tileIndex];
+          if (tile) { dispatch(openDetail(tile)); dispatch(setTrailerPaused(true)); }
+          return;
+        }
+        // Empty → Browse Content
         dispatch(setActivePage('home'));
         engine.setNavRestoreIndex(0);
         loadPage('home');
@@ -325,8 +363,8 @@ export function useInputNavigation() {
         return;
       }
 
-      // Normal tile select
-      const currentRows = rowsRef.current;
+      // Normal tile select — read fresh from store, never from a render-stale ref
+      const currentRows = store.getState().content.rows;
       const row = currentRows[pos.rowIndex];
       const tile = row?.tiles[pos.tileIndex];
       if (tile) { dispatch(openDetail(tile)); dispatch(setTrailerPaused(true)); }
@@ -345,6 +383,11 @@ export function useInputNavigation() {
           dispatch(setDetailButtonIndex(Math.max(0, ov.buttonIndex - 1)));
         } else if (action === 'RIGHT') {
           dispatch(setDetailButtonIndex(Math.min(DETAIL_BUTTON_COUNT - 1, ov.buttonIndex + 1)));
+        } else if (action === 'SELECT') {
+          // Button index 1 = Add/Remove from List
+          if (ov.buttonIndex === 1 && ov.tile) {
+            dispatch(toggleWatchlist(ov.tile));
+          }
         } else if (action === 'BACK') {
           dispatch(closeDetail()); dispatch(setTrailerPaused(false));
         }
@@ -422,7 +465,7 @@ export function useInputNavigation() {
         clearTimeout(searchTimerRef.current);
       }
     };
-  }, [dispatch, loadPage, triggerSearch]); // Engine created once; rows synced via separate effect
+  }, [dispatch, loadPage, triggerSearch, buildMyListRows, buildContentRowsForPage]); // Engine created once; rows synced via separate effect
 
   // Sync engine rows when content rows change (for content pages only)
   useEffect(() => {
@@ -434,6 +477,14 @@ export function useInputNavigation() {
       );
     }
   }, [rows]);
+
+  // Sync engine rows on My List when watchlist changes
+  useEffect(() => {
+    if (!engineRef.current) return;
+    if (activePageRef.current === 'myList') {
+      engineRef.current.setRows(buildMyListRows());
+    }
+  }, [watchlist, buildMyListRows]);
 
   return engineRef;
 }

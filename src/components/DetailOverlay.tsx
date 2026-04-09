@@ -1,6 +1,6 @@
 import { memo, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { selectDetailOverlay } from '../state/selectors';
+import { selectDetailOverlay, selectWatchlist } from '../state/selectors';
 import { getTileImageUrl } from '../data/mockContent';
 import { getTmdbBackdropUrl } from '../data/tmdb';
 import { overlayStyles } from '../styles/componentStyles/overlayStyles';
@@ -8,10 +8,11 @@ import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { easeOut } from '../engine/easing';
 import { mergeStyles } from '../styles/styleEngine';
 
-const BUTTONS = ['Play', 'Add to List', 'Like'];
-
 export const DetailOverlay = memo(function DetailOverlay() {
   const { open, tile, buttonIndex } = useSelector(selectDetailOverlay);
+  const watchlist = useSelector(selectWatchlist);
+  const inList = !!tile && watchlist.some((t) => t.id === tile.id);
+  const BUTTONS = ['Play', inList ? 'Remove from List' : 'Add to List', 'Like'];
 
   // Slide-up animation driven by ScrollEngine
   const slideAnim = useScrollAnimation('detail-slide', 100);

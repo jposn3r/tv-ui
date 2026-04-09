@@ -76,9 +76,31 @@ Tracking remaining work for the TV UI project. Updated as we go.
 - [x] DetailOverlay slide-up animation fixed — rAF-driven via ScrollEngine (was missing CSS keyframe)
 - [x] Mute hint indicator on tile trailers
 
+### Navigation Hardening
+- [x] `useInputNavigation` reads row shape and tile data directly from `store.getState()` (never from render-stale refs) so the engine always sees the correct row counts the instant a page switch happens. Fixes "stuck between first two rows after returning from My List" regression.
+
+### Tests
+- [x] Vitest installed (`npm test`, `npm run test:watch`)
+- [x] FocusEngine unit tests: horizontal nav, vertical nav, row-memory, page transitions, nav-bar interactions, onFocusChange (16 tests)
+- [x] Regression test: My List → Home row swap doesn't strand the user in a stale 2-row engine state
+- [ ] Integration tests for useInputNavigation page-switch flows
+- [ ] Tests for ScrollEngine animation interruption
+
+### Phase 5: Watchlist + User Data Control
+- [x] `watchlistSlice` (toggle / clear / hydrate) wired into the root store
+- [x] `localStorage` persistence (`tvui:watchlist:v1`) — hydrate on boot, write on change
+- [x] DetailOverlay middle button toggles between "Add to List" / "Remove from List"
+- [x] Overlay SELECT handler dispatches `toggleWatchlist`
+- [x] My List page renders watchlist tiles when populated, empty-state CTA when empty
+- [x] Engine rows for My List rebuild when watchlist changes (tiles row + clear-data row)
+- [x] "Clear All Saved Data" button (focusable) — wipes all `tvui:*` localStorage keys and reloads
+- [ ] Toast / haptic feedback when adding/removing from list (optional polish)
+- [ ] Sort options (Recently Added / A-Z) once list grows
+- [ ] Tile-level "in list" badge on ContentTile across other pages
+
 ## Up Next
 
-### Phase 5: Performance HUD + Metrics (Expand)
+### Phase 6: Performance HUD + Metrics (Expand)
 - [x] FPS counter (rAF-based frame timing)
 - [x] Mounted component counter (tileCounter utility)
 - [x] PerformanceHUD component (toggle with backtick key, updates every 500ms)
@@ -89,7 +111,7 @@ Tracking remaining work for the TV UI project. Updated as we go.
 - [ ] Scroll smoothness (dropped frame detection)
 - [ ] Performance API markers (focus-change, scroll-animation, row-mount)
 
-### Phase 6: Final Polish + Documentation
+### Phase 7: Final Polish + Documentation
 - [ ] Edge cases: boundary nav, variable row lengths, rapid key press, window resize
 - [ ] Accessibility: role="grid"/row/gridcell, aria-selected, live region announcements
 - [ ] README with architecture decisions (ADRs)

@@ -2,7 +2,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { store } from './state/store';
+import { attachWatchlistPersistence } from './state/persistence';
 import App from './App';
+
+attachWatchlistPersistence(store);
 
 // Global reset — TV apps have no scroll, no selection, dark background
 const style = document.createElement('style');

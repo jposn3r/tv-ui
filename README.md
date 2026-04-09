@@ -46,6 +46,8 @@ Open `http://localhost:5173` in your browser.
 | ` (backtick) | Toggle Performance HUD (FPS + mounted tile count) |
 | Any letter/number | Direct typing in search mode |
 
+In the detail overlay, the middle button toggles between **Add to List** and **Remove from List** depending on whether the title is already saved.
+
 Mouse is intentionally disabled — TV apps don't have cursors.
 
 ## Features
@@ -62,6 +64,14 @@ Mouse is intentionally disabled — TV apps don't have cursors.
 - **Deferred unmounting** — Rows and tiles stay mounted during scroll animations and are removed only after they're fully off-screen.
 - **Performance HUD** — Press backtick to see live FPS and mounted tile count (~30-50 tiles instead of ~240).
 - **Image cache awareness** — Logos appear instantly on revisited pages with no re-fade animation.
+
+### Watchlist + User Data Control
+- **Persistent My List** — Saves are stored in `localStorage` under `tvui:watchlist:v1`, hydrated on boot, and rendered as tiles on the My List page.
+- **Toggle from detail overlay** — The middle button label flips between "Add to List" and "Remove from List" based on current membership.
+- **Clear All Saved Data** — A focusable button at the bottom of My List wipes every `tvui:*` localStorage key and reloads, giving the user full control over their data.
+
+### Tests
+- **Vitest** — `npm test` (one-shot) / `npm run test:watch`. 16 unit tests cover the FocusEngine: horizontal nav, vertical nav with row memory, page-shape transitions (including the My List ↔ Home regression), nav-bar interactions, and listener notifications.
 
 ### Navigation
 - **Hero focus stop** — Navigation flows Nav bar ↔ Hero buttons ↔ Content rows. The hero section stays full-height when moving between hero and nav.
@@ -87,7 +97,8 @@ src/
 │   ├── YouTubePlayer# Reusable YT.Player wrapper with lifecycle management
 │   ├── SearchPage   # On-screen keyboard grid + TMDB search results
 │   ├── MyListPage   # Empty state with focusable CTA
-│   ├── DetailOverlay# Expanded view on Enter
+│   ├── DetailOverlay# Expanded view on Enter, with Add/Remove from List toggle
+│   ├── MyListPage   # Watchlist tiles + Clear All Saved Data button
 │   ├── FocusRing    # Scale + shadow focus indicator with trailer scale override
 │   └── PerformanceHUD # FPS + mounted tile counter (backtick toggle)
 ├── hooks/           # React bridges to engines
@@ -95,7 +106,7 @@ src/
 │   ├── useTrailerPreview   # Dwell timer → fetch trailer key → signal readiness
 │   ├── useScrollAnimation  # React bridge to ScrollEngine
 │   └── useYouTubeApi       # Singleton YouTube IFrame API loader
-├── state/           # Redux store, slices (focus, content, UI, trailer), selectors
+├── state/           # Redux store, slices (focus, content, UI, trailer, watchlist), selectors, localStorage persistence
 ├── data/            # TMDB integration (content, logos, trailers), per-page configs, mock fallback
 └── styles/
     ├── theme          # Color palette, spacing, typography, animation tokens
@@ -115,4 +126,4 @@ src/
 
 ## Project Status
 
-Phases 1-4 complete: Focus Engine + Navigation, multi-page with search, trailer previews, virtualized rendering, rAF scroll engine, and Gibbon-inspired styling system. See [NEXTSTEPS.md](NEXTSTEPS.md) for remaining work including extended performance metrics, accessibility, deployment, and demo video.
+Phases 1-5 complete: Focus Engine + Navigation, multi-page with search, trailer previews, virtualized rendering, rAF scroll engine, Gibbon-inspired styling system, and persistent watchlist with user data control. FocusEngine is now covered by unit tests. See [NEXTSTEPS.md](NEXTSTEPS.md) for remaining work including extended performance metrics, accessibility, deployment, and demo video.

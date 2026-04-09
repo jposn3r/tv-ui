@@ -3,6 +3,7 @@ import focusReducer from './slices/focusSlice';
 import contentReducer from './slices/contentSlice';
 import uiReducer from './slices/uiSlice';
 import trailerReducer from './slices/trailerSlice';
+import watchlistReducer from './slices/watchlistSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     content: contentReducer,
     ui: uiReducer,
     trailer: trailerReducer,
+    watchlist: watchlistReducer,
   },
 });
 

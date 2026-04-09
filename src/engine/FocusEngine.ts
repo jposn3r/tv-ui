@@ -43,6 +43,10 @@ export class FocusEngine {
     };
   }
 
+  getRows(): RowDescriptor[] {
+    return this.rows;
+  }
+
   setRows(rows: RowDescriptor[], clearMemory = false): void {
     this.rows = rows;
     if (clearMemory) {
