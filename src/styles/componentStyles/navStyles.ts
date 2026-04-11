@@ -1,6 +1,6 @@
 import { createStyles } from '../styleEngine';
 import { theme } from '../theme';
-import type { InteractionMode } from '../state/slices/uiSlice';
+import type { InteractionMode } from '../../state/slices/uiSlice';
 
 export const navStyles = createStyles({
   container: (navFocused: boolean) => ({

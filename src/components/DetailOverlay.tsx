@@ -28,7 +28,7 @@ export const DetailOverlay = memo(function DetailOverlay() {
   const BUTTONS = ['Play', inList ? 'Remove from List' : 'Add to List', 'Like'];
 
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
-  const [videoPlaying, setVideoPlaying] = useState(false);
+  const [, setVideoPlaying] = useState(false);
 
   useEffect(() => {
     if (!open || !tile?.tmdbId || !tile?.mediaType) {
@@ -262,7 +262,7 @@ export const DetailOverlay = memo(function DetailOverlay() {
 
         {/* Action buttons */}
         <div style={overlayStyles.buttonsRow}>
-          {BUTTONS.map((label, i) => (
+          {BUTTONS.map((label) => (
             <button
               key={label}
               style={overlayStyles.button(false, true)}
