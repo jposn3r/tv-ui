@@ -1,4 +1,4 @@
-import { type CSSProperties, memo, useState, useRef, useEffect } from 'react';
+import { type CSSProperties, memo, useState, useRef, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { theme } from '../styles/theme';
 import { getTileImageUrl } from '../data/mockContent';
@@ -8,18 +8,21 @@ import { YouTubePlayer } from './YouTubePlayer';
 import { useTrailerPreview } from '../hooks/useTrailerPreview';
 import { selectLastNavAction, selectTrailerMuted, selectTrailerPaused } from '../state/selectors';
 import { setTileTrailerPlaying, setActiveTrailer } from '../state/slices/trailerSlice';
+import { openDetail } from '../state/slices/uiSlice';
+import { setTrailerPaused } from '../state/slices/trailerSlice';
+import { useIsTvMode } from '../hooks/useMode';
+import { useResponsive } from '../hooks/useResponsive';
+import { getTmdbPosterUrl } from '../data/tmdb';
 import type { TileData } from '../state/slices/contentSlice';
 import type { NavigationAction } from '../engine/FocusEngine';
 import { tileCounter } from '../utils/tileCounter';
 
-// Check if an image URL is already in the browser cache
 function isImageCached(src: string): boolean {
   const img = new Image();
   img.src = src;
   return img.complete && img.naturalWidth > 0;
 }
 
-/** Logo with fade-in on load — instant for cached images, no flash */
 function TileLogo({ logoPath, logoOnRight, isFocused, fadeOut = false }: {
   logoPath: string;
   logoOnRight: boolean;
@@ -27,7 +30,6 @@ function TileLogo({ logoPath, logoOnRight, isFocused, fadeOut = false }: {
   fadeOut?: boolean;
 }) {
   const src = getTmdbLogoUrl(logoPath, 'w300');
-  // If cached, start loaded immediately — no fade, no flash
   const cachedOnMount = useRef(isImageCached(src)).current;
   const [loaded, setLoaded] = useState(cachedOnMount);
 
@@ -41,19 +43,13 @@ function TileLogo({ logoPath, logoOnRight, isFocused, fadeOut = false }: {
     filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))',
     opacity: fadeOut ? 0 : loaded ? (isFocused ? 1 : 0.8) : 0,
     transform: loaded ? 'scale(1)' : 'scale(0.92)',
-    // Skip transition for cached images — appear instantly
     transition: cachedOnMount
       ? 'opacity 200ms ease-out'
       : `opacity ${theme.animation.trailerFadeMs}ms ease-out, transform 350ms ease-out`,
   };
 
   return (
-    <img
-      src={src}
-      alt=""
-      style={style}
-      onLoad={() => setLoaded(true)}
-    />
+    <img src={src} alt="" style={style} onLoad={() => setLoaded(true)} />
   );
 }
 
@@ -65,6 +61,41 @@ function getTransformOrigin(action: NavigationAction | null): string {
     case 'DOWN': return 'center top';
     default: return 'center center';
   }
+}
+
+/** Netflix-style hover info card (web mode) */
+function WebTileInfo({ tile, visible }: { tile: TileData; visible: boolean }) {
+  const genres = tile.genre.split(/,\s*/);
+  const match = 75 + (parseInt(tile.id.replace(/\D/g, '') || '0', 10) % 24);
+
+  const card: CSSProperties = {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'linear-gradient(0deg, rgba(20,20,20,0.95) 0%, rgba(20,20,20,0.8) 60%, transparent 100%)',
+    padding: '40px 10px 8px',
+    opacity: visible ? 1 : 0,
+    transition: 'opacity 200ms ease-out',
+    pointerEvents: 'none',
+    borderRadius: `0 0 ${theme.tile.borderRadius}px ${theme.tile.borderRadius}px`,
+  };
+
+  return (
+    <div style={card}>
+      <div style={{ color: '#fff', fontSize: 12, fontWeight: 600, marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: theme.typography.fontFamily }}>
+        {tile.title}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontFamily: theme.typography.fontFamily }}>
+        <span style={{ color: '#46d369', fontWeight: 600 }}>{match}%</span>
+        <span style={{ border: '1px solid rgba(255,255,255,0.4)', padding: '0 3px', color: '#999', borderRadius: 2, fontSize: 9, lineHeight: '14px' }}>{tile.rating}</span>
+        <span style={{ color: '#999' }}>{tile.year}</span>
+      </div>
+      <div style={{ fontSize: 9, color: '#888', marginTop: 3, fontFamily: theme.typography.fontFamily }}>
+        {genres.slice(0, 3).join(' \u2022 ')}
+      </div>
+    </div>
+  );
 }
 
 interface ContentTileProps {
@@ -81,8 +112,10 @@ export const ContentTile = memo(function ContentTile({
   isRowFocused,
 }: ContentTileProps) {
   const dispatch = useDispatch();
+  const isTv = useIsTvMode();
+  const { isMobile } = useResponsive();
+  const [hovered, setHovered] = useState(false);
 
-  // Track mounted tile count for Performance HUD
   useEffect(() => {
     tileCounter.mount();
     return () => tileCounter.unmount();
@@ -92,22 +125,23 @@ export const ContentTile = memo(function ContentTile({
   const lastNavAction = useSelector(selectLastNavAction);
   const trailerMuted = useSelector(selectTrailerMuted);
   const trailerPaused = useSelector(selectTrailerPaused);
-  const { showTrailer, trailerKey } = useTrailerPreview(tile, isFocused, trailerPaused);
+
+  // In TV mode, use focus-based trailer preview. In web mode, use hover.
+  const effectiveFocused = isTv ? isFocused : false;
+  const { showTrailer, trailerKey } = useTrailerPreview(tile, effectiveFocused, trailerPaused);
   const [videoPlaying, setVideoPlaying] = useState(false);
 
-  // Track the last nav action when this tile loses focus for directional shrink
+  // Track the last nav action when this tile loses focus for directional shrink (TV only)
   const shrinkOriginRef = useRef<string>('center center');
   const wasFocusedRef = useRef(isFocused);
 
   useEffect(() => {
     if (wasFocusedRef.current && !isFocused) {
-      // Tile just lost focus — capture the nav direction for shrink
       shrinkOriginRef.current = getTransformOrigin(lastNavAction);
     }
     wasFocusedRef.current = isFocused;
   }, [isFocused, lastNavAction]);
 
-  // Coordinate tile trailer state with Redux
   useEffect(() => {
     if (!showTrailer) {
       setVideoPlaying(false);
@@ -116,22 +150,31 @@ export const ContentTile = memo(function ContentTile({
     }
   }, [showTrailer, dispatch]);
 
-  const isTrailerActive = showTrailer && !!trailerKey;
+  const handleClick = useCallback(() => {
+    if (!isTv) {
+      dispatch(openDetail(tile));
+      dispatch(setTrailerPaused(true));
+    }
+  }, [dispatch, tile, isTv]);
 
-  // When trailer plays, expand to 16:9 to avoid cropping the video
+  const isTrailerActive = showTrailer && !!trailerKey;
   const trailerWidth = isTrailerActive ? theme.tile.width * 1.15 : theme.tile.width;
   const trailerHeight = isTrailerActive ? Math.round(trailerWidth * 9 / 16) : theme.tile.height;
+
+  // Determine visual state
+  const isHighlighted = isTv ? isFocused : hovered;
+  const brightness = isHighlighted ? 1.1 : (isTv && isRowFocused) ? 0.7 : isTv ? 0.45 : 0.75;
 
   const containerStyle: CSSProperties = {
     width: theme.tile.width,
     height: theme.tile.height,
     flexShrink: 0,
-    cursor: 'default',
+    cursor: isTv ? 'default' : 'pointer',
     userSelect: 'none',
     overflow: 'visible',
+    scrollSnapAlign: isTv ? undefined : 'start',
   };
 
-  const brightness = isFocused ? 1.1 : isRowFocused ? 0.7 : 0.45;
   const imgStyle: CSSProperties = {
     width: '100%',
     height: '100%',
@@ -140,14 +183,88 @@ export const ContentTile = memo(function ContentTile({
     display: 'block',
     filter: `brightness(${brightness})`,
     transition: `filter ${theme.animation.focusDuration}ms ease-out, opacity ${theme.animation.trailerFadeMs}ms ease-out`,
-    // Fade out backdrop when video is confirmed playing — synchronized with video fade-in
     opacity: videoPlaying ? 0 : 1,
   };
 
-
-  // Determine transform origin: use shrink direction when defocusing, center when focused
   const transformOrigin = isFocused ? 'center center' : shrinkOriginRef.current;
 
+  // Mobile mode: poster card
+  if (!isTv && isMobile) {
+    const POSTER_W = 110;
+    const POSTER_H = 165;
+    const posterSrc = tile.posterPath
+      ? getTmdbPosterUrl(tile.posterPath)
+      : (tile.backdropPath ? getTmdbBackdropUrl(tile.backdropPath) : getTileImageUrl(tile.imageIndex));
+
+    return (
+      <div
+        style={{
+          width: POSTER_W,
+          height: POSTER_H,
+          flexShrink: 0,
+          cursor: 'pointer',
+          borderRadius: 6,
+          overflow: 'hidden',
+          scrollSnapAlign: 'start',
+        }}
+        onClick={handleClick}
+        aria-label={`${tile.title}, ${tile.year}`}
+      >
+        <img
+          src={posterSrc}
+          alt={tile.title}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          loading="lazy"
+        />
+      </div>
+    );
+  }
+
+  // Web mode: simpler render with hover effects
+  if (!isTv) {
+    const webScale = hovered ? 1.08 : 1;
+    const wrapperStyle: CSSProperties = {
+      transition: `transform 200ms ease-out, box-shadow 200ms ease-out`,
+      transform: `scale(${webScale})`,
+      zIndex: hovered ? 10 : 1,
+      position: 'relative',
+      boxShadow: hovered ? '0 8px 24px rgba(0,0,0,0.7)' : 'none',
+      borderRadius: theme.tile.borderRadius,
+    };
+
+    return (
+      <div
+        style={containerStyle}
+        onClick={handleClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        aria-label={`${tile.title}, ${tile.year}, ${tile.rating}`}
+      >
+        <div style={wrapperStyle}>
+          <div style={{
+            position: 'relative',
+            width: theme.tile.width,
+            height: theme.tile.height,
+            borderRadius: theme.tile.borderRadius,
+            overflow: 'hidden',
+          }}>
+            <img
+              src={tile.backdropPath ? getTmdbBackdropUrl(tile.backdropPath) : getTileImageUrl(tile.imageIndex)}
+              alt={tile.title}
+              style={imgStyle}
+              loading="lazy"
+            />
+            {tile.logoPath && (
+              <TileLogo logoPath={tile.logoPath} logoOnRight={logoOnRight} isFocused={hovered} />
+            )}
+            <WebTileInfo tile={tile} visible={hovered} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // TV mode: focus ring + trailer
   return (
     <div
       style={containerStyle}
@@ -174,7 +291,6 @@ export const ContentTile = memo(function ContentTile({
             style={imgStyle}
             loading="lazy"
           />
-          {/* YouTube trailer overlay */}
           {isTrailerActive && (
             <YouTubePlayer
               videoKey={trailerKey!}
@@ -187,37 +303,18 @@ export const ContentTile = memo(function ContentTile({
               }}
               onEnded={() => setVideoPlaying(false)}
               onError={() => setVideoPlaying(false)}
-              style={{
-                borderRadius: theme.tile.borderRadius,
-              }}
+              style={{ borderRadius: theme.tile.borderRadius }}
             />
           )}
-          {/* Logo overlay — fade in on load, fade out with backdrop when video plays */}
           {tile.logoPath && (
-            <TileLogo
-              logoPath={tile.logoPath}
-              logoOnRight={logoOnRight}
-              isFocused={isFocused}
-              fadeOut={videoPlaying}
-            />
+            <TileLogo logoPath={tile.logoPath} logoOnRight={logoOnRight} isFocused={isFocused} fadeOut={videoPlaying} />
           )}
-          {/* Mute hint — visible when trailer is playing */}
           {videoPlaying && (
             <div style={{
-              position: 'absolute',
-              bottom: 6,
-              right: 6,
-              padding: '3px 7px',
-              borderRadius: 3,
-              background: 'rgba(0,0,0,0.6)',
-              color: '#fff',
-              fontSize: 10,
-              fontWeight: 500,
-              opacity: 0.7,
-              pointerEvents: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
+              position: 'absolute', bottom: 6, right: 6, padding: '3px 7px',
+              borderRadius: 3, background: 'rgba(0,0,0,0.6)', color: '#fff',
+              fontSize: 10, fontWeight: 500, opacity: 0.7, pointerEvents: 'none',
+              display: 'flex', alignItems: 'center', gap: 4,
             }}>
               {trailerMuted ? '🔇' : '🔊'} M
             </div>

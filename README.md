@@ -1,129 +1,136 @@
 # JFlix
 
-A TV-style content browser built to behave like an actual TV app: keyboard-only navigation, custom focus management, trailer previews, and no mouse interactions. Built as a portfolio piece demonstrating the engineering challenges of TV UI development.
+A Netflix-inspired streaming UI that runs in three modes: a standard **web** experience with mouse interaction and native scrolling, a responsive **mobile** layout with bottom tabs and poster grids, and an immersive **TV mode** with keyboard/gamepad-only navigation, custom focus management, and full-screen detail views. Built as a portfolio piece demonstrating multi-platform UI engineering.
 
 ## What This Is
 
-This is not a web app styled to look like a TV — it's architected like one. The entire interaction model is built from scratch: a custom 2D focus engine, abstract input handling (keyboard today, remote/gamepad tomorrow), YouTube trailer previews with dwell-to-play, and a rendering layer designed to be swapped out for a custom renderer.
+A single React codebase that adapts to three interaction paradigms — web (mouse/click), mobile (touch), and TV (D-pad/keyboard) — sharing the same content pipeline, state management, and component tree. A labeled Web/TV toggle in the nav bar switches between modes on desktop.
 
 ## Stack
 
-- **React 18 + TypeScript + Vite** — no Next.js, keep it simple like a TV app
-- **Redux Toolkit** — predictable state for focus position, content data, UI state, trailer coordination
-- **TMDB API** — real movie/show backdrops, logo title treatments, and YouTube trailer keys
-- **YouTube IFrame Player API** — trailer previews on tiles and hero banner
-- **Zero UI/CSS libraries** — no Tailwind, no styled-components, no Material UI. All styling is JS-object based (inspired by Netflix's Gibbon renderer concept)
+- **React 18 + TypeScript + Vite**
+- **Redux Toolkit** — focus position, content data, UI state, trailer coordination, mode management
+- **TMDB API** — real movie/show backdrops, posters, logos, trailers, season/episode data
+- **YouTube IFrame Player API** — trailer previews on tiles, hero, and detail views
+- **Zero UI/CSS libraries** — all styling is JS-object based (inspired by Netflix's Gibbon renderer)
 
 ## Running Locally
 
 ```bash
-# Clone and install
 git clone https://github.com/<your-username>/tv-ui.git
 cd tv-ui
 npm install
 
 # Add your TMDB API token
-# Get a free Read Access Token from https://www.themoviedb.org/settings/api
 echo "VITE_TMDB_TOKEN=your_token_here" > .env
 
-# Start dev server
 npm run dev
 ```
 
 Open `http://localhost:5173` in your browser.
 
-## Controls
+## Three Modes
+
+### Web Mode (default)
+- Mouse-driven navigation with native browser scrolling
+- Netflix-style hover cards on tiles (expand with match %, rating, year, genres)
+- Clickable nav bar, hero buttons, and tile cards
+- Detail modal with trailer, metadata, synopsis, and episode browser for TV shows
+- Horizontal scroll with chevron buttons on content rows
+
+### Mobile Mode (< 768px)
+- Netflix mobile-style layout with portrait poster tiles
+- Bottom tab navigation (Home, Search, New & Hot, My List)
+- Horizontal carousels with touch-friendly swipe scrolling
+- No TV mode toggle (web-only on mobile)
+
+### TV Mode (toggle from desktop nav)
+- Keyboard/gamepad-only navigation with custom 2D focus engine
+- Full-screen detail view with trailer playing, metadata, and episode/season browser
+- Cursor auto-hides on keyboard input, reappears on mouse movement
+- Welcome modal on first load explaining controls
+- All the original TV-specific features: trailer dwell-to-play, directional shrink, parallax hero
+
+## Controls (TV Mode)
 
 | Key | Action |
 |-----|--------|
-| Arrow Keys | Navigate the 2D content grid / hero buttons / nav bar / search keyboard |
-| Enter / Space | Select (open detail, switch page, press search key) |
-| Escape / Backspace | Close detail overlay (Backspace deletes in search) |
-| Left / Right (in overlay) | Navigate overlay buttons |
-| WASD | Alternative directional nav (passes through as letters in search) |
+| Arrow Keys | Navigate content grid, hero buttons, nav bar, search keyboard |
+| Enter / Space | Select |
+| Escape / Backspace | Back / Close |
+| WASD | Alternative directional nav |
 | M | Toggle mute on active trailer |
 | P | Toggle pause on active trailer |
-| ` (backtick) | Toggle Performance HUD (FPS + mounted tile count) |
-| Any letter/number | Direct typing in search mode |
-
-In the detail overlay, the middle button toggles between **Add to List** and **Remove from List** depending on whether the title is already saved.
-
-Mouse is intentionally disabled — TV apps don't have cursors.
+| ` (backtick) | Toggle Performance HUD |
 
 ## Features
 
+### Multi-Mode Architecture
+- **Mode detection** — `useMode()` / `useResponsive()` hooks drive conditional rendering throughout the component tree
+- **Shared state** — Redux store, TMDB data layer, and content pipeline are mode-agnostic
+- **Persisted preference** — Mode choice saved to localStorage, restored on reload
+- **Conditional input** — TV mode activates FocusEngine + InputManager; web mode uses native DOM events
+
+### Content & Data
+- **TMDB-powered** — 12+ content rows per page with real backdrops, logos, and metadata
+- **Multi-page** — Home, TV Shows, Movies, New & Popular, My List, Search with page caching
+- **Episode browser** — Real season/episode data from TMDB with thumbnails, titles, runtimes, descriptions
+- **Search** — TMDB search with 500ms debounce (on-screen keyboard in TV mode, standard input in web)
+- **Watchlist** — Persistent My List with localStorage, add/remove from detail view
+
 ### Trailer Previews
-- **Tile trailers** — Focus on any tile for 2 seconds and a YouTube trailer auto-plays. The tile expands to 16:9, the backdrop and logo crossfade out as the video fades in. Navigate away and the tile shrinks back with directional animation.
-- **Hero trailer** — The hero banner has focusable Play and Add to List buttons. While focused, the hero auto-plays a trailer after 2 seconds. Scroll down to content rows and it fades back to the static backdrop.
-- **One trailer at a time** — Tile trailers pause the hero; returning to hero stops the tile trailer.
-- **Global mute/pause** — M mutes whichever trailer is active. P pauses it. Detail overlay auto-pauses.
+- **Tile trailers** — 2s dwell in TV mode, tile expands to 16:9 with crossfade
+- **Hero trailer** — Auto-plays in both web and TV mode
+- **Detail trailer** — Plays at the top of the detail modal/fullscreen view
+- **One at a time** — Tile playing pauses hero; detail overlay pauses tile
+- **Global mute/pause** — M/P keys control whichever trailer is active
 
-### Virtualized Rendering
-- **Vertical virtualization** — Only ~7 rows render around the focused row (±3 buffer). Rows are absolutely positioned to eliminate layout shift on mount/unmount.
-- **Horizontal virtualization** — Only visible tiles + buffer rendered per row. The visible window covers both previous and current scroll positions during animation so no tiles pop in or out.
-- **Deferred unmounting** — Rows and tiles stay mounted during scroll animations and are removed only after they're fully off-screen.
-- **Performance HUD** — Press backtick to see live FPS and mounted tile count (~30-50 tiles instead of ~240).
-- **Image cache awareness** — Logos appear instantly on revisited pages with no re-fade animation.
-
-### Watchlist + User Data Control
-- **Persistent My List** — Saves are stored in `localStorage` under `tvui:watchlist:v1`, hydrated on boot, and rendered as tiles on the My List page.
-- **Toggle from detail overlay** — The middle button label flips between "Add to List" and "Remove from List" based on current membership.
-- **Clear All Saved Data** — A focusable button at the bottom of My List wipes every `tvui:*` localStorage key and reloads, giving the user full control over their data.
-
-### Tests
-- **Vitest** — `npm test` (one-shot) / `npm run test:watch`. 16 unit tests cover the FocusEngine: horizontal nav, vertical nav with row memory, page-shape transitions (including the My List ↔ Home regression), nav-bar interactions, and listener notifications.
-
-### Navigation
-- **Hero focus stop** — Navigation flows Nav bar ↔ Hero buttons ↔ Content rows. The hero section stays full-height when moving between hero and nav.
-- **Multi-page** — Home, TV Shows, Movies, New & Popular, My List, Search — each with unique TMDB-powered content and page caching.
-- **Search** — On-screen keyboard grid with physical keyboard passthrough and TMDB search with 500ms debounce.
-- **Row scroll memory** — Rows hold their horizontal scroll position on vertical navigation. Only Left/Right scrolls.
+### Performance
+- **Vertical virtualization** — Only ~7 rows render around focus (TV mode)
+- **Horizontal virtualization** — Only visible tiles + buffer per row (TV mode)
+- **rAF scroll engine** — Custom animation engine with easing, mid-animation interruption
+- **Performance HUD** — Live FPS + mounted tile count (backtick toggle)
+- **Image cache awareness** — Logos appear instantly on revisited pages
 
 ## Architecture
 
 ```
 src/
-├── engine/          # Framework-agnostic core logic
-│   ├── FocusEngine  # 2D grid nav with row memory, nav bar support
-│   ├── InputManager # Keyboard → abstract actions, raw key passthrough for search
-│   ├── ScrollEngine # rAF-driven animation engine with mid-animation interruption
-│   └── easing       # easeOut, easeOutQuart/Quint, easeInOut, spring physics
-├── components/      # React UI layer
-│   ├── Shell        # App shell with per-page vertical scrolling
-│   ├── NavBar       # Top navigation (Home, TV Shows, Movies, New & Popular, My List, Search)
-│   ├── ContentRow   # Horizontally virtualized scrollable row
-│   ├── ContentTile  # Content card with trailer preview, logo fade-in, directional shrink
-│   ├── HeroBanner   # Featured content with trailer playback, parallax, focusable buttons
-│   ├── YouTubePlayer# Reusable YT.Player wrapper with lifecycle management
-│   ├── SearchPage   # On-screen keyboard grid + TMDB search results
-│   ├── MyListPage   # Empty state with focusable CTA
-│   ├── DetailOverlay# Expanded view on Enter, with Add/Remove from List toggle
-│   ├── MyListPage   # Watchlist tiles + Clear All Saved Data button
-│   ├── FocusRing    # Scale + shadow focus indicator with trailer scale override
-│   └── PerformanceHUD # FPS + mounted tile counter (backtick toggle)
-├── hooks/           # React bridges to engines
-│   ├── useInputNavigation  # Wires FocusEngine + InputManager to Redux
-│   ├── useTrailerPreview   # Dwell timer → fetch trailer key → signal readiness
-│   ├── useScrollAnimation  # React bridge to ScrollEngine
-│   └── useYouTubeApi       # Singleton YouTube IFrame API loader
-├── state/           # Redux store, slices (focus, content, UI, trailer, watchlist), selectors, localStorage persistence
-├── data/            # TMDB integration (content, logos, trailers), per-page configs, mock fallback
-└── styles/
-    ├── theme          # Color palette, spacing, typography, animation tokens
-    ├── styleEngine    # createStyles() + mergeStyles() — Gibbon-inspired, no CSS cascade
-    └── componentStyles/ # Per-component style definitions (tile, hero, overlay, nav, etc.)
+├── engine/              # Framework-agnostic core (TV mode)
+│   ├── FocusEngine      # 2D grid nav with row memory
+│   ├── InputManager     # Keyboard → abstract actions
+│   ├── ScrollEngine     # rAF animation engine
+│   └── easing           # Easing functions
+├── components/          # React UI layer
+│   ├── Shell            # Mode-aware app shell (web/mobile/TV layouts)
+│   ├── NavBar           # Top nav with Web/TV toggle (desktop)
+│   ├── MobileNavBar     # Bottom tab bar (mobile)
+│   ├── GlobalStyles     # Dynamic <style> tag per mode
+│   ├── ContentRow       # Horizontal row (native scroll or engine-driven)
+│   ├── ContentTile      # Tile with hover card (web) or focus ring (TV)
+│   ├── HeroBanner       # Featured content with trailer
+│   ├── DetailOverlay    # Modal (web) or fullscreen (TV) with episode browser
+│   ├── EpisodeBrowser   # Season tabs + episode list from TMDB
+│   ├── WelcomeModal     # TV mode first-load instructions
+│   └── ...
+├── hooks/               # React bridges
+│   ├── useMode          # Read interaction mode from Redux
+│   ├── useResponsive    # Window size / mobile detection
+│   ├── useCursorHide    # Auto-hide cursor in TV mode
+│   ├── usePageLoader    # Shared page content loading
+│   ├── useInputNavigation  # TV mode: FocusEngine + InputManager → Redux
+│   ├── useTrailerPreview   # Dwell timer → trailer key → playback
+│   └── useScrollAnimation  # React bridge to ScrollEngine
+├── state/               # Redux (focus, content, UI, trailer, watchlist)
+├── data/                # TMDB (content, logos, trailers, episodes), page configs
+└── styles/              # Theme, styleEngine, per-component styles
 ```
 
-**Key design decisions:**
+## Tests
 
-- **Custom focus engine over browser focus** — `tabIndex` and `:focus` are designed for mouse+keyboard web apps. TV UIs need 2D spatial navigation, focus memory across rows, and debounced input handling.
-- **No CSS framework** — TV apps don't use CSS cascade. A custom `styleEngine` defines frozen JS-object styles per component (like React Native's `StyleSheet.create`). No CSS cascade, no specificity issues — predictable and GPU-friendly.
-- **rAF scroll engine over CSS transitions** — CSS transitions can't be interrupted mid-animation without jank and are hard to coordinate with virtualization. A custom `ScrollEngine` driven by `requestAnimationFrame` gives frame-level control with easeOutQuint/Quart easing for smooth, uniform scroll behavior.
-- **Engine/UI separation** — FocusEngine and InputManager have zero React dependencies. The rendering layer could be swapped for a custom renderer without touching navigation logic.
-- **Progressive data loading** — Content rows appear instantly with backdrops. Logo title treatments and trailer keys stream in asynchronously so the UI is never blocked.
-- **Trailer coordination via Redux** — A dedicated trailer slice tracks active trailer source, mute/pause state, and tile-vs-hero priority. Only one trailer plays at a time, and the detail overlay auto-pauses playback.
-- **Virtualization with deferred unmount** — Rows and tiles only render near the focus point. Previous scroll positions stay mounted during animations to prevent pop-in. Absolutely positioned rows eliminate layout shift entirely.
+```bash
+npm test          # one-shot
+npm run test:watch
+```
 
-## Project Status
-
-Phases 1-5 complete: Focus Engine + Navigation, multi-page with search, trailer previews, virtualized rendering, rAF scroll engine, Gibbon-inspired styling system, and persistent watchlist with user data control. FocusEngine is now covered by unit tests. See [NEXTSTEPS.md](NEXTSTEPS.md) for remaining work including extended performance metrics, accessibility, deployment, and demo video.
+16 unit tests cover FocusEngine: horizontal/vertical nav, row memory, page transitions, nav-bar interactions.

@@ -49,4 +49,5 @@ export const tileStyles = createStyles({
       ? 'opacity 200ms ease-out'
       : `opacity ${theme.animation.trailerFadeMs}ms ease-out, transform 350ms ease-out`,
   }),
+
 });

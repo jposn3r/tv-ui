@@ -56,6 +56,7 @@ export function toTile(item: TmdbResult): TileData | null {
     synopsis: item.overview || 'No description available.',
     imageIndex: item.id,
     backdropPath: item.backdrop_path,
+    posterPath: item.poster_path ?? undefined,
     tmdbId: item.id,
     mediaType: (item.media_type === 'tv' || item.first_air_date) ? 'tv' as const : 'movie' as const,
   };
@@ -344,4 +345,99 @@ export async function fetchTitleLogo(
   } catch {
     return null;
   }
+}
+
+// --- Season/Episode data for TV shows ---
+
+export interface SeasonSummary {
+  seasonNumber: number;
+  name: string;
+  episodeCount: number;
+  posterPath: string | null;
+}
+
+export interface Episode {
+  episodeNumber: number;
+  name: string;
+  overview: string;
+  stillPath: string | null;
+  runtime: number | null;
+  airDate: string | null;
+}
+
+interface TmdbTvDetailResponse {
+  seasons: {
+    season_number: number;
+    name: string;
+    episode_count: number;
+    poster_path: string | null;
+  }[];
+}
+
+interface TmdbSeasonResponse {
+  episodes: {
+    episode_number: number;
+    name: string;
+    overview: string;
+    still_path: string | null;
+    runtime: number | null;
+    air_date: string | null;
+  }[];
+}
+
+const tvDetailCache = new Map<number, SeasonSummary[]>();
+const episodeCache = new Map<string, Episode[]>();
+
+export async function fetchTvSeasons(tvId: number): Promise<SeasonSummary[]> {
+  const cached = tvDetailCache.get(tvId);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}`, { headers });
+    if (!res.ok) return [];
+    const data: TmdbTvDetailResponse = await res.json();
+    const seasons = data.seasons
+      .filter((s) => s.season_number > 0) // exclude "specials" (season 0)
+      .map((s) => ({
+        seasonNumber: s.season_number,
+        name: s.name,
+        episodeCount: s.episode_count,
+        posterPath: s.poster_path,
+      }));
+    tvDetailCache.set(tvId, seasons);
+    return seasons;
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchEpisodes(tvId: number, seasonNumber: number): Promise<Episode[]> {
+  const key = `${tvId}-${seasonNumber}`;
+  const cached = episodeCache.get(key);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(
+      `https://api.themoviedb.org/3/tv/${tvId}/season/${seasonNumber}`,
+      { headers }
+    );
+    if (!res.ok) return [];
+    const data: TmdbSeasonResponse = await res.json();
+    const episodes = data.episodes.map((ep) => ({
+      episodeNumber: ep.episode_number,
+      name: ep.name,
+      overview: ep.overview,
+      stillPath: ep.still_path,
+      runtime: ep.runtime,
+      airDate: ep.air_date,
+    }));
+    episodeCache.set(key, episodes);
+    return episodes;
+  } catch {
+    return [];
+  }
+}
+
+export function getTmdbStillUrl(stillPath: string, size = 'w300'): string {
+  return `${IMG_BASE}/${size}${stillPath}`;
 }

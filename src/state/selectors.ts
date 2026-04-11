@@ -25,6 +25,7 @@ export const selectTileTrailerPlaying = (state: RootState) => state.trailer.tile
 export const selectHeroFocused = (state: RootState) => state.ui.heroFocused;
 export const selectHeroButtonIndex = (state: RootState) => state.ui.heroButtonIndex;
 
+export const selectInteractionMode = (state: RootState) => state.ui.interactionMode;
 export const selectWatchlist = (state: RootState) => state.watchlist.items;
 export const selectIsInWatchlist = (id: string) => (state: RootState) =>
   state.watchlist.items.some((t) => t.id === id);

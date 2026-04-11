@@ -9,6 +9,7 @@ export interface TileData {
   synopsis: string;
   imageIndex: number;
   backdropPath?: string;
+  posterPath?: string;
   logoPath?: string;
   tmdbId?: number;
   mediaType?: 'movie' | 'tv';

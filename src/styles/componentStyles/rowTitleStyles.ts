@@ -2,13 +2,13 @@ import { createStyles } from '../styleEngine';
 import { theme } from '../theme';
 
 export const rowTitleStyles = createStyles({
-  title: (isRowFocused: boolean) => ({
+  title: (isRowFocused: boolean, paddingLeft = theme.spacing.edgePadding) => ({
     color: theme.colors.text,
     fontSize: theme.typography.rowTitle.fontSize,
     fontWeight: theme.typography.rowTitle.fontWeight,
     letterSpacing: theme.typography.rowTitle.letterSpacing,
     marginBottom: 12,
-    paddingLeft: theme.spacing.edgePadding,
+    paddingLeft,
     opacity: isRowFocused ? 1 : 0.6,
     transition: 'opacity 200ms ease-out',
   }),

@@ -1,24 +1,52 @@
-import { memo } from 'react';
-import { useSelector } from 'react-redux';
-import { selectActivePage, selectNavFocused, selectNavIndex } from '../state/selectors';
+import { memo, useCallback } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectActivePage, selectNavFocused, selectNavIndex, selectInteractionMode } from '../state/selectors';
+import { setInteractionMode } from '../state/slices/uiSlice';
 import { NAV_ITEMS } from '../data/pageConfigs';
 import { navStyles } from '../styles/componentStyles/navStyles';
+import { useIsTvMode } from '../hooks/useMode';
+import { useResponsive } from '../hooks/useResponsive';
+import { usePageLoader } from '../hooks/usePageLoader';
+import type { PageId, InteractionMode } from '../state/slices/uiSlice';
 
 export const NavBar = memo(function NavBar() {
+  const dispatch = useDispatch();
   const activePage = useSelector(selectActivePage);
   const navFocused = useSelector(selectNavFocused);
   const navIndex = useSelector(selectNavIndex);
+  const interactionMode = useSelector(selectInteractionMode);
+  const isTv = useIsTvMode();
+  const { isMobile } = useResponsive();
+  const loadPage = usePageLoader();
+
+  const handleNavClick = useCallback((pageId: PageId) => {
+    if (!isTv) {
+      loadPage(pageId);
+    }
+  }, [loadPage, isTv]);
+
+  const handleModeToggle = useCallback(() => {
+    const next: InteractionMode = interactionMode === 'tv' ? 'web' : 'tv';
+    dispatch(setInteractionMode(next));
+  }, [dispatch, interactionMode]);
+
+  // Mobile: don't show nav bar (bottom tabs will be separate)
+  if (isMobile) return null;
 
   return (
-    <nav style={navStyles.container(navFocused)} role="navigation" aria-label="Main navigation">
+    <nav style={navStyles.container(isTv && navFocused)} role="navigation" aria-label="Main navigation">
       <div style={navStyles.logo}>J</div>
       <ul style={navStyles.navList}>
         {NAV_ITEMS.map((item, i) => {
           const isActive = activePage === item.id;
-          const isFocused = navFocused && navIndex === i;
+          const isFocused = isTv && navFocused && navIndex === i;
 
           return (
-            <li key={item.id} style={navStyles.navItem(isActive, isFocused)}>
+            <li
+              key={item.id}
+              style={navStyles.navItem(isActive, isFocused, !isTv)}
+              onClick={() => handleNavClick(item.id)}
+            >
               {item.id === 'search' ? (
                 <span style={navStyles.searchLabel}>
                   <svg style={navStyles.searchIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -35,6 +63,18 @@ export const NavBar = memo(function NavBar() {
           );
         })}
       </ul>
+      {/* Web/TV toggle — desktop only */}
+      <div style={navStyles.toggleContainer}>
+        <button
+          style={navStyles.toggleButton(interactionMode)}
+          onClick={handleModeToggle}
+          aria-label={`Switch to ${interactionMode === 'tv' ? 'web' : 'TV'} mode`}
+        >
+          <span style={navStyles.toggleLabel(interactionMode === 'web')}>Web</span>
+          <span style={navStyles.toggleLabel(interactionMode === 'tv')}>TV</span>
+          <span style={navStyles.toggleSlider(interactionMode === 'tv')} />
+        </button>
+      </div>
     </nav>
   );
 });

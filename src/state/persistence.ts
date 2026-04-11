@@ -1,9 +1,11 @@
 import type { Store } from '@reduxjs/toolkit';
 import type { RootState } from './store';
 import { hydrateWatchlist } from './slices/watchlistSlice';
+import { setInteractionMode, type InteractionMode } from './slices/uiSlice';
 import type { TileData } from './slices/contentSlice';
 
 const STORAGE_KEY = 'tvui:watchlist:v1';
+const MODE_KEY = 'tvui:mode:v1';
 
 export function loadWatchlist(): TileData[] {
   try {
@@ -16,23 +18,43 @@ export function loadWatchlist(): TileData[] {
   }
 }
 
-export function attachWatchlistPersistence(store: Store<RootState>) {
+export function loadMode(): InteractionMode {
+  try {
+    const raw = localStorage.getItem(MODE_KEY);
+    if (raw === 'tv' || raw === 'web') return raw;
+    return 'web';
+  } catch {
+    return 'web';
+  }
+}
+
+export function attachPersistence(store: Store<RootState>) {
   // Hydrate on boot
   const initial = loadWatchlist();
   if (initial.length > 0) {
     store.dispatch(hydrateWatchlist(initial));
   }
 
-  let last = store.getState().watchlist.items;
+  const savedMode = loadMode();
+  store.dispatch(setInteractionMode(savedMode));
+
+  let lastWatchlist = store.getState().watchlist.items;
+  let lastMode = store.getState().ui.interactionMode;
   store.subscribe(() => {
-    const curr = store.getState().watchlist.items;
-    if (curr !== last) {
-      last = curr;
+    const state = store.getState();
+    const currWatchlist = state.watchlist.items;
+    if (currWatchlist !== lastWatchlist) {
+      lastWatchlist = currWatchlist;
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(curr));
-      } catch {
-        // quota / privacy mode — ignore
-      }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currWatchlist));
+      } catch { /* ignore */ }
+    }
+    const currMode = state.ui.interactionMode;
+    if (currMode !== lastMode) {
+      lastMode = currMode;
+      try {
+        localStorage.setItem(MODE_KEY, currMode);
+      } catch { /* ignore */ }
     }
   });
 }

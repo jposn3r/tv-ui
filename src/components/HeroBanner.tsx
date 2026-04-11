@@ -11,12 +11,17 @@ import {
   selectHeroFocused, selectHeroButtonIndex, selectTileTrailerPlaying, selectNavFocused,
 } from '../state/selectors';
 import { setActiveTrailer } from '../state/slices/trailerSlice';
+import { openDetail } from '../state/slices/uiSlice';
+import { toggleWatchlist } from '../state/slices/watchlistSlice';
+import { setTrailerPaused } from '../state/slices/trailerSlice';
 import { YouTubePlayer } from './YouTubePlayer';
+import { useIsTvMode } from '../hooks/useMode';
 
 const HERO_BUTTONS = ['▶  Play', '+ Add to List'];
 
 export const HeroBanner = memo(function HeroBanner() {
   const dispatch = useDispatch();
+  const isTv = useIsTvMode();
   const focus = useSelector(selectFocus);
   const rows = useSelector(selectRows);
   const trailerMuted = useSelector(selectTrailerMuted);
@@ -34,8 +39,10 @@ export const HeroBanner = memo(function HeroBanner() {
   const tileIdRef = useRef<string | null>(null);
 
   // Should the hero trailer be active?
-  // Only when hero is focused AND no tile trailer is playing AND not paused
-  const shouldPlayTrailer = heroFocused && !tileTrailerPlaying && !trailerPaused;
+  // TV: when hero is focused. Web: autoplay after delay.
+  const shouldPlayTrailer = isTv
+    ? (heroFocused && !tileTrailerPlaying && !trailerPaused)
+    : !trailerPaused;
 
   // Fetch trailer key when hero becomes focused (with delay)
   useEffect(() => {
@@ -97,9 +104,10 @@ export const HeroBanner = memo(function HeroBanner() {
     dispatch(setActiveTrailer(null));
   }, [dispatch]);
 
-  // Parallax: animate scrollRatio via ScrollEngine
-  // Hero stays full on row 0, begins gentle shrink on row 1, fully shrunk by row 4
-  const targetScrollRatio = (heroFocused || navFocused || focus.rowIndex <= 0) ? 0 : Math.min((focus.rowIndex - 0.5) / 4, 1);
+  // Parallax: animate scrollRatio via ScrollEngine (TV mode only)
+  const targetScrollRatio = isTv
+    ? ((heroFocused || navFocused || focus.rowIndex <= 0) ? 0 : Math.min((focus.rowIndex - 0.5) / 4, 1))
+    : 0;
   const parallax = useScrollAnimation('hero-parallax', 0);
   const prevParallaxTarget = useRef(targetScrollRatio);
 
@@ -158,9 +166,23 @@ export const HeroBanner = memo(function HeroBanner() {
         )}
         <div style={heroStyles.synopsis}>{firstTile.synopsis}</div>
 
-        <div style={heroStyles.buttonsRow(heroFocused)}>
+        <div style={heroStyles.buttonsRow(isTv ? heroFocused : true)}>
           {HERO_BUTTONS.map((label, i) => (
-            <button key={label} style={heroStyles.heroButton(heroFocused && i === heroButtonIndex)} tabIndex={-1}>
+            <button
+              key={label}
+              style={heroStyles.heroButton(isTv ? (heroFocused && i === heroButtonIndex) : false, !isTv)}
+              tabIndex={isTv ? -1 : 0}
+              onClick={() => {
+                if (!isTv && firstTile) {
+                  if (i === 0) {
+                    dispatch(openDetail(firstTile));
+                    dispatch(setTrailerPaused(true));
+                  } else {
+                    dispatch(toggleWatchlist(firstTile));
+                  }
+                }
+              }}
+            >
               {label}
             </button>
           ))}

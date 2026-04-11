@@ -2,8 +2,10 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { TileData } from './contentSlice';
 
 export type PageId = 'home' | 'tvShows' | 'movies' | 'newPopular' | 'myList' | 'search';
+export type InteractionMode = 'web' | 'tv';
 
 interface UIState {
+  interactionMode: InteractionMode;
   activePage: PageId;
   navFocused: boolean;
   navIndex: number;
@@ -19,6 +21,7 @@ interface UIState {
 }
 
 const initialState: UIState = {
+  interactionMode: 'web',
   activePage: 'home',
   navFocused: false,
   navIndex: 0,
@@ -84,6 +87,9 @@ export const uiSlice = createSlice({
     setHeroButtonIndex(state, action: PayloadAction<number>) {
       state.heroButtonIndex = action.payload;
     },
+    setInteractionMode(state, action: PayloadAction<InteractionMode>) {
+      state.interactionMode = action.payload;
+    },
   },
 });
 
@@ -91,6 +97,6 @@ export const {
   openDetail, closeDetail, setDetailButtonIndex, togglePerfHud,
   setActivePage, setNavFocused, setNavIndex,
   setSearchQuery, appendSearchChar, deleteSearchChar, clearSearchQuery,
-  setHeroFocused, setHeroButtonIndex,
+  setHeroFocused, setHeroButtonIndex, setInteractionMode,
 } = uiSlice.actions;
 export default uiSlice.reducer;
