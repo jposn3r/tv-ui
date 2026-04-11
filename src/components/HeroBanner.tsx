@@ -119,7 +119,7 @@ export const HeroBanner = memo(function HeroBanner() {
   // Hide video when banner is shrinking
   const videoVisible = showVideo && trailerKey && scrollRatio < 0.2;
 
-  const trailerIsLive = videoPlaying && videoVisible;
+  const trailerIsLive = !!(videoPlaying && videoVisible);
 
   if (!firstTile) return null;
 

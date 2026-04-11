@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { theme } from '../styles/theme';
 import { shellStyles } from '../styles/componentStyles/shellStyles';
-import { selectRows, selectFocus, selectActivePage, selectNavFocused, selectSearchResults, selectHeroFocused } from '../state/selectors';
+import { selectRows, selectFocus, selectActivePage, selectNavFocused, selectHeroFocused } from '../state/selectors';
 import { ContentRow } from './ContentRow';
 import { HeroBanner } from './HeroBanner';
 import { DetailOverlay } from './DetailOverlay';
@@ -26,7 +26,6 @@ export function Shell() {
   const activePage = useSelector(selectActivePage);
   const navFocused = useSelector(selectNavFocused);
   const heroFocused = useSelector(selectHeroFocused);
-  const searchResults = useSelector(selectSearchResults);
   const shellRef = useRef<HTMLDivElement>(null);
 
   const isSearch = activePage === 'search';
