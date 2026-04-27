@@ -7,11 +7,14 @@ import type { CSSProperties } from 'react';
 interface EpisodeBrowserProps {
   tvId: number;
   isTv: boolean;
+  /** Which zone of the parent detail view has focus. null = somewhere else (e.g., action buttons),
+   *  in which case NEITHER season tabs NOR episode rows show a focus ring. */
+  focusedZone?: 'seasons' | 'episodes' | null;
   focusedSeason?: number;
   focusedEpisode?: number;
 }
 
-export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode = -1 }: EpisodeBrowserProps) {
+export function EpisodeBrowser({ tvId, isTv, focusedZone = null, focusedSeason = 0, focusedEpisode = -1 }: EpisodeBrowserProps) {
   const [seasons, setSeasons] = useState<SeasonSummary[]>([]);
   const [activeSeason, setActiveSeason] = useState(0);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
@@ -57,12 +60,12 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
   // make the page feel laggy past the visible fold.
   useLayoutEffect(() => {
     if (!isTv) return;
-    if (focusedEpisode >= 0 && focusedEpisodeRef.current) {
+    if (focusedZone === 'episodes' && focusedEpisodeRef.current) {
       focusedEpisodeRef.current.scrollIntoView({ block: 'nearest', behavior: 'auto' });
-    } else if (focusedEpisode === -1 && seasonTabsRef.current) {
+    } else if (focusedZone === 'seasons' && seasonTabsRef.current) {
       seasonTabsRef.current.scrollIntoView({ block: 'nearest', behavior: 'auto' });
     }
-  }, [isTv, focusedEpisode, focusedSeason]);
+  }, [isTv, focusedZone, focusedEpisode, focusedSeason]);
 
   if (loading || seasons.length === 0) return null;
 
@@ -86,7 +89,9 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
       <div ref={seasonTabsRef} style={seasonTabs as CSSProperties}>
         {seasons.map((s, i) => {
           const isActive = i === activeSeason;
-          const isFocusedTab = isTv && focusedEpisode === -1 && i === focusedSeason;
+          // Tabs only show a focus ring when the parent explicitly says the
+          // seasons zone has focus — never when zone is 'buttons' or 'episodes'.
+          const isFocusedTab = isTv && focusedZone === 'seasons' && i === focusedSeason;
           // Three states with clear visual hierarchy:
           //   focused: bright white border + glow (cursor is here)
           //   active:  subtle bg + bold text (this is the season whose episodes are showing)
@@ -123,7 +128,9 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
           // Clamp the incoming focused index to the current episode range so we always
           // render a valid focus state, even briefly during a season swap.
           const clampedFocus = Math.max(0, Math.min(focusedEpisode, episodes.length - 1));
-          const isFocusedEp = isTv && focusedEpisode >= 0 && i === clampedFocus;
+          // Episode rows only show a focus ring when the parent says the episodes
+          // zone has focus — never when zone is 'buttons' or 'seasons'.
+          const isFocusedEp = isTv && focusedZone === 'episodes' && i === clampedFocus;
           const epStyle: CSSProperties = {
             display: 'flex',
             gap: 16,

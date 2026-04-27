@@ -210,15 +210,16 @@ export const DetailOverlay = memo(function DetailOverlay() {
           </span>
         </div>
 
-        {/* Episode browser for TV shows. Focus state comes from Redux when the user
-            navigates with arrow keys — seasons zone tracks seasonIndex with episode = -1,
-            episodes zone tracks episodeIndex with the active season selected. */}
+        {/* Episode browser for TV shows. focusedZone is set ONLY when the user is
+            actually navigating that zone — passing null hides ALL focus rings inside
+            the browser (e.g., when focus is on the action buttons up top). */}
         {isTvShow && tile.tmdbId && (
           <EpisodeBrowser
             tvId={tile.tmdbId}
             isTv={true}
+            focusedZone={zone === 'seasons' ? 'seasons' : zone === 'episodes' ? 'episodes' : null}
             focusedSeason={seasonIndex}
-            focusedEpisode={zone === 'episodes' ? episodeIndex : -1}
+            focusedEpisode={episodeIndex}
           />
         )}
       </div>
