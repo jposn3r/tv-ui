@@ -123,32 +123,29 @@ export function YouTubePlayer({
     ...style,
   };
 
-  // Strategy: oversize the iframe and offset it upward so the YouTube title bar
-  // and the bottom progress strip are physically pushed *outside* the wrapper's
-  // overflow:hidden box. The video itself gets cropped slightly on top/bottom
-  // (a few percent of vertical content) but no chrome can ever leak through —
-  // there's literally nothing rendering inside the visible region except the
-  // middle of the video.
+  // Strategy: oversize the iframe so the YouTube title bar and bottom progress
+  // strip are pushed outside the wrapper's overflow:hidden box, AND lay a solid
+  // mask at the top that covers any residual chrome which slips back into view
+  // at small tile sizes (where the title bar is a larger relative portion).
   const iframeContainerStyle: CSSProperties = {
     position: 'absolute',
-    top: '-18%',
+    top: '-22%',
     left: '-2%',
     width: '104%',
-    height: '136%',
+    height: '144%',
   };
 
-  // Belt-and-suspenders: solid bg-color band at the very top to absorb any chrome
-  // that survives the oversize trick (notably at tiny tile sizes where YouTube's
-  // title is a larger relative portion). Fades to transparent so the band feels
-  // like a natural vignette rather than a hard cut.
+  // Top mask is SOLID #141414 (matches app surface) for most of its height so
+  // any title remnants are completely opaque-covered, then a short gradient
+  // fade at the bottom edge so the transition into the video isn't a hard cut.
   const topMaskStyle: CSSProperties = {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: '20%',
+    height: '22%',
     background:
-      'linear-gradient(180deg, #141414 0%, rgba(20,20,20,0.85) 40%, rgba(20,20,20,0.4) 75%, transparent 100%)',
+      'linear-gradient(180deg, #141414 0%, #141414 70%, rgba(20,20,20,0.55) 88%, transparent 100%)',
     pointerEvents: 'none',
     zIndex: 2,
   };
@@ -157,9 +154,9 @@ export function YouTubePlayer({
     bottom: 0,
     left: 0,
     right: 0,
-    height: '12%',
+    height: '14%',
     background:
-      'linear-gradient(0deg, #141414 0%, rgba(20,20,20,0.7) 50%, transparent 100%)',
+      'linear-gradient(0deg, #141414 0%, #141414 60%, rgba(20,20,20,0.4) 85%, transparent 100%)',
     pointerEvents: 'none',
     zIndex: 2,
   };
