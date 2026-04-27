@@ -324,6 +324,7 @@ export const ContentTile = memo(function ContentTile({
               fontSize: 10, fontWeight: 500, opacity: 0.7, pointerEvents: 'none',
               display: 'flex', alignItems: 'center', gap: 4,
               fontFamily: 'ui-monospace, SF Mono, Menlo, monospace',
+              zIndex: 3, // above the YouTube chrome mask (zIndex 2)
             }}>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',

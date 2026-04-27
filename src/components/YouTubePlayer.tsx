@@ -113,16 +113,54 @@ export function YouTubePlayer({
     }
   }, [muted]);
 
-  const containerStyle: CSSProperties = {
+  const wrapperStyle: CSSProperties = {
     position: 'absolute',
     inset: 0,
     overflow: 'hidden',
     pointerEvents: 'none',
-    // Hidden until video is actually playing — no loading spinner, title bar, or black frame visible
     opacity: isPlaying ? 1 : 0,
     transition: `opacity ${fadeDuration}ms ease-out`,
     ...style,
   };
 
-  return <div ref={containerRef} style={containerStyle} />;
+  const iframeContainerStyle: CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+  };
+
+  // Mask the top of the player so the YouTube title bar (and any share / watch-later
+  // icons that pop in on hover) is never visible. Gradient fades to transparent so
+  // it doesn't visually chop the video — the dark portion just covers where the
+  // title text would render.
+  const topMaskStyle: CSSProperties = {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '32%',
+    background:
+      'linear-gradient(180deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0.45) 75%, transparent 100%)',
+    pointerEvents: 'none',
+    zIndex: 2,
+  };
+  // Smaller bottom mask in case YouTube's progress bar tries to render despite controls=0.
+  const bottomMaskStyle: CSSProperties = {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '14%',
+    background:
+      'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 50%, transparent 100%)',
+    pointerEvents: 'none',
+    zIndex: 2,
+  };
+
+  return (
+    <div style={wrapperStyle}>
+      <div ref={containerRef} style={iframeContainerStyle} />
+      <div style={topMaskStyle} />
+      <div style={bottomMaskStyle} />
+    </div>
+  );
 }
