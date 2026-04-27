@@ -65,15 +65,11 @@ export const ContentRow = memo(function ContentRow({
   const updateChevrons = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    // scroll-snap aligns the first tile to the snap start, which means scrollLeft
-    // is paddingLeft when "at the start". Anything beyond that is real scroll.
-    const cs = window.getComputedStyle(el);
-    const paddingLeft = parseFloat(cs.paddingLeft || '0');
-    const paddingRight = parseFloat(cs.paddingRight || '0');
+    // With scrollPaddingLeft set, the start position is scrollLeft=0.
     const SLOP = 4;
     const maxScroll = el.scrollWidth - el.clientWidth;
-    const canScrollLeft = el.scrollLeft > paddingLeft + SLOP;
-    const canScrollRight = el.scrollLeft < maxScroll - paddingRight - SLOP;
+    const canScrollLeft = el.scrollLeft > SLOP;
+    const canScrollRight = el.scrollLeft < maxScroll - SLOP;
     setShowLeftChevron(canScrollLeft);
     setShowRightChevron(canScrollRight);
   }, []);
@@ -114,6 +110,7 @@ export const ContentRow = memo(function ContentRow({
               ...rowStyles.webTilesWrapper,
               paddingLeft: edgePad,
               paddingRight: edgePad,
+              scrollPaddingLeft: edgePad,
               gap: isMobile ? 8 : theme.spacing.tileGap,
             }}
             onScroll={updateChevrons}

@@ -39,6 +39,9 @@ export const rowStyles = createStyles({
     overflowX: 'auto' as const,
     overflowY: 'hidden' as const,
     scrollSnapType: 'x mandatory' as const,
+    // Inset the snap-start so the first tile aligns with the row title's
+    // left edge instead of being snapped flush against the viewport edge.
+    scrollPaddingLeft: theme.spacing.edgePadding,
     scrollbarWidth: 'none' as const,
     msOverflowStyle: 'none' as const,
     paddingTop: 16,
