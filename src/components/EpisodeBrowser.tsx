@@ -87,9 +87,13 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
           const isFocusedTab = isTv && focusedEpisode === -1 && i === focusedSeason;
           const tabStyle: CSSProperties = {
             padding: '6px 16px',
-            borderRadius: 4,
-            border: isFocusedTab ? '2px solid #fff' : 'none',
+            borderRadius: 6,
+            // Same border width on focused/unfocused so the tab doesn't jump on focus change.
+            border: isFocusedTab ? '2px solid #ffffff' : '2px solid transparent',
             background: isActive ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)',
+            boxShadow: isFocusedTab
+              ? '0 0 0 1px rgba(255,255,255,0.35), 0 0 14px rgba(255,255,255,0.2)'
+              : 'none',
             color: isActive ? '#fff' : 'rgba(255,255,255,0.6)',
             fontSize: 13,
             fontWeight: isActive ? 600 : 400,
@@ -97,6 +101,8 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
             whiteSpace: 'nowrap',
             flexShrink: 0,
             fontFamily: theme.typography.fontFamily,
+            outline: 'none',
+            transition: 'background 120ms ease-out, border-color 120ms ease-out, box-shadow 120ms ease-out',
           };
           return (
             <button key={s.seasonNumber} style={tabStyle} onClick={() => !isTv && setActiveSeason(i)}>
@@ -109,17 +115,26 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
       {/* Episode list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {episodes.map((ep, i) => {
-          const isFocusedEp = isTv && focusedEpisode === i;
+          // Clamp the incoming focused index to the current episode range so we always
+          // render a valid focus state, even briefly during a season swap.
+          const clampedFocus = Math.max(0, Math.min(focusedEpisode, episodes.length - 1));
+          const isFocusedEp = isTv && focusedEpisode >= 0 && i === clampedFocus;
           const epStyle: CSSProperties = {
             display: 'flex',
             gap: 16,
             padding: 12,
             borderRadius: 8,
-            background: isFocusedEp ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
-            // Solid white 2px border + subtle outer glow when focused.
-            border: isFocusedEp ? '2px solid #ffffff' : '2px solid transparent',
-            boxShadow: isFocusedEp ? '0 0 0 1px rgba(255,255,255,0.15), 0 4px 16px rgba(0,0,0,0.4)' : 'none',
-            transition: 'background 150ms ease-out, border-color 150ms ease-out, box-shadow 150ms ease-out',
+            position: 'relative',
+            background: isFocusedEp ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.04)',
+            // 3px white border on focus, same-width transparent border off so there's no layout shift.
+            border: isFocusedEp ? '3px solid #ffffff' : '3px solid transparent',
+            // Stacked glow: tight inner ring + soft drop shadow. Stays visible against
+            // any backdrop, including bright stills behind the page.
+            boxShadow: isFocusedEp
+              ? '0 0 0 1px rgba(255,255,255,0.4), 0 0 20px rgba(255,255,255,0.25), 0 6px 20px rgba(0,0,0,0.5)'
+              : 'none',
+            outline: 'none',
+            transition: 'background 120ms ease-out, border-color 120ms ease-out, box-shadow 120ms ease-out',
             cursor: isTv ? 'default' : 'pointer',
           };
 
