@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { theme } from '../styles/theme';
 import { fetchTvSeasons, fetchEpisodes, getTmdbStillUrl } from '../data/tmdb';
 import type { SeasonSummary, Episode } from '../data/tmdb';
@@ -51,14 +51,16 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
     return () => { cancelled = true; };
   }, [tvId, activeSeason, seasons]);
 
-  // Scroll the focused episode into view when navigating in TV mode
-  useEffect(() => {
+  // Keep the focused row in view as the user navigates. useLayoutEffect runs after
+  // DOM updates but before paint, and we use 'instant' (auto) scroll behavior so
+  // rapid key repeat doesn't queue up overlapping smooth-scroll animations that
+  // make the page feel laggy past the visible fold.
+  useLayoutEffect(() => {
     if (!isTv) return;
     if (focusedEpisode >= 0 && focusedEpisodeRef.current) {
-      focusedEpisodeRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      focusedEpisodeRef.current.scrollIntoView({ block: 'nearest', behavior: 'auto' });
     } else if (focusedEpisode === -1 && seasonTabsRef.current) {
-      // Seasons zone — scroll the tab row into view
-      seasonTabsRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      seasonTabsRef.current.scrollIntoView({ block: 'nearest', behavior: 'auto' });
     }
   }, [isTv, focusedEpisode, focusedSeason]);
 
@@ -85,16 +87,19 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
         {seasons.map((s, i) => {
           const isActive = i === activeSeason;
           const isFocusedTab = isTv && focusedEpisode === -1 && i === focusedSeason;
+          // Three states with clear visual hierarchy:
+          //   focused: bright white border + glow (cursor is here)
+          //   active:  subtle bg + bold text (this is the season whose episodes are showing)
+          //   neither: muted bg + dim text
           const tabStyle: CSSProperties = {
             padding: '6px 16px',
             borderRadius: 6,
-            // Same border width on focused/unfocused so the tab doesn't jump on focus change.
             border: isFocusedTab ? '2px solid #ffffff' : '2px solid transparent',
-            background: isActive ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)',
+            background: isActive ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
             boxShadow: isFocusedTab
-              ? '0 0 0 1px rgba(255,255,255,0.35), 0 0 14px rgba(255,255,255,0.2)'
+              ? '0 0 0 1px rgba(255,255,255,0.4), 0 0 16px rgba(255,255,255,0.25)'
               : 'none',
-            color: isActive ? '#fff' : 'rgba(255,255,255,0.6)',
+            color: isActive ? '#fff' : 'rgba(255,255,255,0.55)',
             fontSize: 13,
             fontWeight: isActive ? 600 : 400,
             cursor: isTv ? 'default' : 'pointer',
@@ -102,7 +107,7 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
             flexShrink: 0,
             fontFamily: theme.typography.fontFamily,
             outline: 'none',
-            transition: 'background 120ms ease-out, border-color 120ms ease-out, box-shadow 120ms ease-out',
+            transition: 'background 120ms ease-out, border-color 120ms ease-out, box-shadow 120ms ease-out, color 120ms ease-out',
           };
           return (
             <button key={s.seasonNumber} style={tabStyle} onClick={() => !isTv && setActiveSeason(i)}>
