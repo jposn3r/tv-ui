@@ -18,6 +18,8 @@ interface UIState {
   };
   perfHudVisible: boolean;
   searchQuery: string;
+  /** Transient hint shown when the user mouse-clicks something in TV mode that's keyboard-only. */
+  tvHintVisible: boolean;
 }
 
 const initialState: UIState = {
@@ -34,6 +36,7 @@ const initialState: UIState = {
   },
   perfHudVisible: false,
   searchQuery: '',
+  tvHintVisible: false,
 };
 
 export const uiSlice = createSlice({
@@ -90,6 +93,12 @@ export const uiSlice = createSlice({
     setInteractionMode(state, action: PayloadAction<InteractionMode>) {
       state.interactionMode = action.payload;
     },
+    showTvHint(state) {
+      state.tvHintVisible = true;
+    },
+    hideTvHint(state) {
+      state.tvHintVisible = false;
+    },
   },
 });
 
@@ -98,5 +107,6 @@ export const {
   setActivePage, setNavFocused, setNavIndex,
   setSearchQuery, appendSearchChar, deleteSearchChar, clearSearchQuery,
   setHeroFocused, setHeroButtonIndex, setInteractionMode,
+  showTvHint, hideTvHint,
 } = uiSlice.actions;
 export default uiSlice.reducer;

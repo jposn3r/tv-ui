@@ -60,7 +60,12 @@ export function loadLegacyFlatWatchlist(): TileData[] {
 export function loadMode(): InteractionMode {
   try {
     const raw = localStorage.getItem(MODE_KEY);
-    if (raw === 'tv' || raw === 'web') return raw;
+    if (!raw) return 'web';
+    // Accept both raw ('tv'/'web') and JSON-quoted ('"tv"'/'"web"') forms — older
+    // builds wrote raw, newer wrote JSON. Be liberal in what we accept.
+    let v = raw;
+    try { v = JSON.parse(raw); } catch { /* not JSON, use raw */ }
+    if (v === 'tv' || v === 'web') return v;
     return 'web';
   } catch {
     return 'web';

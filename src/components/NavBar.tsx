@@ -8,6 +8,7 @@ import { useIsTvMode } from '../hooks/useMode';
 import { useResponsive } from '../hooks/useResponsive';
 import { usePageLoader } from '../hooks/usePageLoader';
 import { useSettings } from '../hooks/useSettings';
+import { useTvHint } from '../hooks/useTvHint';
 import { AvatarDropdown } from './profile/AvatarDropdown';
 import type { PageId, InteractionMode } from '../state/slices/uiSlice';
 
@@ -21,12 +22,17 @@ export const NavBar = memo(function NavBar() {
   const { isMobile } = useResponsive();
   const loadPage = usePageLoader();
   const settings = useSettings();
+  const showTvHint = useTvHint();
 
-  // Nav clicks always work, regardless of mode. Even in TV mode the user may
-  // mouse-click — the engine syncs to activePage on its own.
+  // Nav clicks navigate in web/mobile, but in TV mode they're blocked
+  // and trigger a hint toast instead — this is keyboard-only territory.
   const handleNavClick = useCallback((pageId: PageId) => {
+    if (isTv) {
+      showTvHint();
+      return;
+    }
     loadPage(pageId);
-  }, [loadPage]);
+  }, [loadPage, isTv, showTvHint]);
 
   const handleModeToggle = useCallback(() => {
     const next: InteractionMode = interactionMode === 'tv' ? 'web' : 'tv';

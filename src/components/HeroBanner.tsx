@@ -18,6 +18,7 @@ import { selectCurrentProfileId } from '../state/selectors';
 import { YouTubePlayer } from './YouTubePlayer';
 import { useIsTvMode } from '../hooks/useMode';
 import { useSettings } from '../hooks/useSettings';
+import { useTvHint } from '../hooks/useTvHint';
 
 const HERO_BUTTONS = ['▶  Play', '+ Add to List'];
 
@@ -26,6 +27,7 @@ export const HeroBanner = memo(function HeroBanner() {
   const isTv = useIsTvMode();
   const currentProfileId = useSelector(selectCurrentProfileId);
   const settings = useSettings();
+  const showTvHint = useTvHint();
   const focus = useSelector(selectFocus);
   const rows = useSelector(selectRows);
   const trailerMuted = useSelector(selectTrailerMuted);
@@ -179,7 +181,11 @@ export const HeroBanner = memo(function HeroBanner() {
               style={heroStyles.heroButton(isTv ? (heroFocused && i === heroButtonIndex) : false, !isTv)}
               tabIndex={isTv ? -1 : 0}
               onClick={() => {
-                if (!isTv && firstTile) {
+                if (isTv) {
+                  showTvHint();
+                  return;
+                }
+                if (firstTile) {
                   if (i === 0) {
                     dispatch(openDetail(firstTile));
                     dispatch(setTrailerPaused(true));

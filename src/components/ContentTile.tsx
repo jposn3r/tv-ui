@@ -13,6 +13,7 @@ import { setTrailerPaused } from '../state/slices/trailerSlice';
 import { useIsTvMode } from '../hooks/useMode';
 import { useResponsive } from '../hooks/useResponsive';
 import { useSettings } from '../hooks/useSettings';
+import { useTvHint } from '../hooks/useTvHint';
 import { getTmdbPosterUrl } from '../data/tmdb';
 import type { TileData } from '../state/slices/contentSlice';
 import type { NavigationAction } from '../engine/FocusEngine';
@@ -116,6 +117,7 @@ export const ContentTile = memo(function ContentTile({
   const isTv = useIsTvMode();
   const { isMobile } = useResponsive();
   const settings = useSettings();
+  const showTvHint = useTvHint();
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
@@ -154,11 +156,13 @@ export const ContentTile = memo(function ContentTile({
   }, [showTrailer, dispatch]);
 
   const handleClick = useCallback(() => {
-    if (!isTv) {
-      dispatch(openDetail(tile));
-      dispatch(setTrailerPaused(true));
+    if (isTv) {
+      showTvHint();
+      return;
     }
-  }, [dispatch, tile, isTv]);
+    dispatch(openDetail(tile));
+    dispatch(setTrailerPaused(true));
+  }, [dispatch, tile, isTv, showTvHint]);
 
   const isTrailerActive = showTrailer && !!trailerKey;
   const trailerWidth = isTrailerActive ? theme.tile.width * 1.15 : theme.tile.width;
@@ -267,13 +271,14 @@ export const ContentTile = memo(function ContentTile({
     );
   }
 
-  // TV mode: focus ring + trailer
+  // TV mode: focus ring + trailer. Click triggers hint toast.
   return (
     <div
-      style={containerStyle}
+      style={{ ...containerStyle, cursor: 'pointer' }}
       role="gridcell"
       aria-selected={isFocused}
       aria-label={`${tile.title}, ${tile.year}, ${tile.rating}`}
+      onClick={handleClick}
     >
       <FocusRing
         isFocused={isFocused}

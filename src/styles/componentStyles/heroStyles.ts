@@ -85,13 +85,13 @@ export const heroStyles = createStyles({
     transition: 'opacity 300ms ease-out',
   }),
 
-  heroButton: (isFocused: boolean, isWeb = false) => ({
+  heroButton: (isFocused: boolean, _isWeb = false) => ({
     padding: '12px 28px',
     borderRadius: 4,
     border: 'none',
     fontSize: 16,
     fontWeight: 600,
-    cursor: isWeb ? 'pointer' : 'default' as const,
+    cursor: 'pointer' as const,
     color: isFocused ? '#000' : theme.colors.text,
     background: isFocused ? '#fff' : 'rgba(255,255,255,0.2)',
     transform: isFocused ? 'scale(1.05)' : 'scale(1)',

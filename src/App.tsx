@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { Shell } from './components/Shell';
 import { GlobalStyles } from './components/GlobalStyles';
+import { TvHintToast } from './components/TvHintToast';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { ProfileSelectScreen } from './components/profile/ProfileSelectScreen';
 import { useInputNavigation } from './hooks/useInputNavigation';
@@ -66,6 +67,7 @@ export default function App() {
       {/* TV input navigation only runs when on the main Shell — auth/profile screens have their own keyboard handlers */}
       {isTv && isAuthed && currentProfile && <TvNavigation />}
       {screen}
+      {isTv && isAuthed && currentProfile && <TvHintToast />}
     </>
   );
 }
