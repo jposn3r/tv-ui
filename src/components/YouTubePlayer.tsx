@@ -123,35 +123,43 @@ export function YouTubePlayer({
     ...style,
   };
 
+  // Strategy: oversize the iframe and offset it upward so the YouTube title bar
+  // and the bottom progress strip are physically pushed *outside* the wrapper's
+  // overflow:hidden box. The video itself gets cropped slightly on top/bottom
+  // (a few percent of vertical content) but no chrome can ever leak through —
+  // there's literally nothing rendering inside the visible region except the
+  // middle of the video.
   const iframeContainerStyle: CSSProperties = {
     position: 'absolute',
-    inset: 0,
+    top: '-18%',
+    left: '-2%',
+    width: '104%',
+    height: '136%',
   };
 
-  // Mask the top of the player so the YouTube title bar (and any share / watch-later
-  // icons that pop in on hover) is never visible. Gradient fades to transparent so
-  // it doesn't visually chop the video — the dark portion just covers where the
-  // title text would render.
+  // Belt-and-suspenders: solid bg-color band at the very top to absorb any chrome
+  // that survives the oversize trick (notably at tiny tile sizes where YouTube's
+  // title is a larger relative portion). Fades to transparent so the band feels
+  // like a natural vignette rather than a hard cut.
   const topMaskStyle: CSSProperties = {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: '32%',
+    height: '20%',
     background:
-      'linear-gradient(180deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0.45) 75%, transparent 100%)',
+      'linear-gradient(180deg, #141414 0%, rgba(20,20,20,0.85) 40%, rgba(20,20,20,0.4) 75%, transparent 100%)',
     pointerEvents: 'none',
     zIndex: 2,
   };
-  // Smaller bottom mask in case YouTube's progress bar tries to render despite controls=0.
   const bottomMaskStyle: CSSProperties = {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: '14%',
+    height: '12%',
     background:
-      'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 50%, transparent 100%)',
+      'linear-gradient(0deg, #141414 0%, rgba(20,20,20,0.7) 50%, transparent 100%)',
     pointerEvents: 'none',
     zIndex: 2,
   };
