@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from 'react';
+import { memo, useRef, useState, useLayoutEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { theme } from '../styles/theme';
 import { rowStyles } from '../styles/componentStyles/rowStyles';
@@ -29,8 +29,9 @@ export const ContentRow = memo(function ContentRow({
   const { isMobile } = useResponsive();
   const isRowFocused = isTv && focus.rowIndex === rowIndex && !heroFocused && !navFocused;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Both default to false; useLayoutEffect computes the truth from DOM on mount.
   const [showLeftChevron, setShowLeftChevron] = useState(false);
-  const [showRightChevron, setShowRightChevron] = useState(true);
+  const [showRightChevron, setShowRightChevron] = useState(false);
 
   // ScrollEngine-driven horizontal scroll (TV mode)
   const scroll = useScrollAnimation(`row-${rowIndex}-scroll`, 0);
@@ -61,12 +62,30 @@ export const ContentRow = memo(function ContentRow({
     el.scrollBy({ left: direction === 'right' ? amount : -amount, behavior: 'smooth' });
   };
 
-  const handleScroll = () => {
+  const updateChevrons = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    setShowLeftChevron(el.scrollLeft > 20);
-    setShowRightChevron(el.scrollLeft < el.scrollWidth - el.clientWidth - 20);
-  };
+    // scroll-snap aligns the first tile to the snap start, which means scrollLeft
+    // is paddingLeft when "at the start". Anything beyond that is real scroll.
+    const cs = window.getComputedStyle(el);
+    const paddingLeft = parseFloat(cs.paddingLeft || '0');
+    const paddingRight = parseFloat(cs.paddingRight || '0');
+    const SLOP = 4;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    const canScrollLeft = el.scrollLeft > paddingLeft + SLOP;
+    const canScrollRight = el.scrollLeft < maxScroll - paddingRight - SLOP;
+    setShowLeftChevron(canScrollLeft);
+    setShowRightChevron(canScrollRight);
+  }, []);
+
+  // Compute chevron visibility on mount, on row content change, and on viewport resize.
+  // Don't run in TV mode (no chevrons rendered) or mobile (no chevrons rendered).
+  useLayoutEffect(() => {
+    if (isTv || isMobile) return;
+    updateChevrons();
+    window.addEventListener('resize', updateChevrons);
+    return () => window.removeEventListener('resize', updateChevrons);
+  }, [isTv, isMobile, row.tiles.length, updateChevrons]);
 
   // Web mode: native horizontal scroll
   if (!isTv) {
@@ -97,7 +116,7 @@ export const ContentRow = memo(function ContentRow({
               paddingRight: edgePad,
               gap: isMobile ? 8 : theme.spacing.tileGap,
             }}
-            onScroll={handleScroll}
+            onScroll={updateChevrons}
           >
             {row.tiles.map((tile, tileIndex) => (
               <ContentTile
