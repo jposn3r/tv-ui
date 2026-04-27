@@ -59,37 +59,45 @@ export function AuthScreen() {
     dispatch(logIn(accountId));
   }, [dispatch]);
 
-  // TV keyboard handler
+  // TV keyboard handler. Only arrow keys/Enter/Space — no WASD here because
+  // this screen has text inputs and we must let users type freely.
   useEffect(() => {
     if (!isTv) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp' || e.key === 'w') {
+      // If the user is typing into a form field, let the keystroke through
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        // Still allow arrow keys to move section focus, but never preventDefault on text input
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Escape') {
+          return;
+        }
+      }
+      if (e.key === 'ArrowUp') {
         e.preventDefault();
-        // Up from any form item collapses to the active tab (0 or 1)
         if (focusIdx >= 2) {
           setFocusIdx(tab === 'signup' ? 0 : 1);
         } else {
           setFocusIdx(0);
         }
-      } else if (e.key === 'ArrowDown' || e.key === 's') {
+      } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        // Down from a tab skips past the tab row
         if (focusIdx <= 1) {
           setFocusIdx(2);
         } else {
           setFocusIdx((i) => Math.min(itemCount - 1, i + 1));
         }
-      } else if (e.key === 'ArrowLeft' || e.key === 'a') {
+      } else if (e.key === 'ArrowLeft') {
         if (focusIdx === 0 || focusIdx === 1) {
           setFocusIdx(0);
         }
-      } else if (e.key === 'ArrowRight' || e.key === 'd') {
+      } else if (e.key === 'ArrowRight') {
         if (focusIdx === 0 || focusIdx === 1) {
           setFocusIdx(1);
         }
-      } else if (e.key === 'Enter' || e.key === ' ') {
+      } else if (e.key === 'Enter') {
+        // If focus is in the input, let the form submit handler take over
+        if (target && target.tagName === 'INPUT') return;
         e.preventDefault();
-        // Activate currently-focused item
         if (focusIdx === 0) setTab('signup');
         else if (focusIdx === 1) setTab('login');
         else if (tab === 'signup') {
@@ -99,7 +107,6 @@ export function AuthScreen() {
             handleSignUp();
           }
         } else {
-          // Log In tab
           const accountIdx = focusIdx - 2;
           if (accountIdx >= 0 && accountIdx < accounts.length) {
             handleLogIn(accounts[accountIdx].id);

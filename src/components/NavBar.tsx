@@ -22,11 +22,11 @@ export const NavBar = memo(function NavBar() {
   const loadPage = usePageLoader();
   const settings = useSettings();
 
+  // Nav clicks always work, regardless of mode. Even in TV mode the user may
+  // mouse-click — the engine syncs to activePage on its own.
   const handleNavClick = useCallback((pageId: PageId) => {
-    if (!isTv) {
-      loadPage(pageId);
-    }
-  }, [loadPage, isTv]);
+    loadPage(pageId);
+  }, [loadPage]);
 
   const handleModeToggle = useCallback(() => {
     const next: InteractionMode = interactionMode === 'tv' ? 'web' : 'tv';

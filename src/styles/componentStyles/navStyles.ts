@@ -47,12 +47,12 @@ export const navStyles = createStyles({
     verticalAlign: 'middle',
   },
 
-  navItem: (isActive: boolean, isFocused: boolean, isWeb: boolean) => ({
+  navItem: (isActive: boolean, isFocused: boolean, _isWeb: boolean) => ({
     padding: '6px 14px',
     fontSize: 14,
     fontWeight: isActive ? 700 : 400,
     color: (isFocused || isActive) ? '#ffffff' : 'rgba(255,255,255,0.7)',
-    cursor: isWeb ? 'pointer' : 'default' as const,
+    cursor: 'pointer' as const,
     borderRadius: 4,
     background: isFocused ? 'rgba(255,255,255,0.15)' : 'transparent',
     transition: 'all 150ms ease-out',
