@@ -15,6 +15,10 @@ interface UIState {
     open: boolean;
     tile: TileData | null;
     buttonIndex: number;
+    /** Which zone of the TV detail view has focus: action buttons, season tabs, or episode list. */
+    zone: 'buttons' | 'seasons' | 'episodes';
+    seasonIndex: number;
+    episodeIndex: number;
   };
   perfHudVisible: boolean;
   searchQuery: string;
@@ -33,6 +37,9 @@ const initialState: UIState = {
     open: false,
     tile: null,
     buttonIndex: 0,
+    zone: 'buttons',
+    seasonIndex: 0,
+    episodeIndex: 0,
   },
   perfHudVisible: false,
   searchQuery: '',
@@ -47,14 +54,29 @@ export const uiSlice = createSlice({
       state.detailOverlay.open = true;
       state.detailOverlay.tile = action.payload;
       state.detailOverlay.buttonIndex = 0;
+      state.detailOverlay.zone = 'buttons';
+      state.detailOverlay.seasonIndex = 0;
+      state.detailOverlay.episodeIndex = 0;
     },
     closeDetail(state) {
       state.detailOverlay.open = false;
       state.detailOverlay.tile = null;
       state.detailOverlay.buttonIndex = 0;
+      state.detailOverlay.zone = 'buttons';
+      state.detailOverlay.seasonIndex = 0;
+      state.detailOverlay.episodeIndex = 0;
     },
     setDetailButtonIndex(state, action: PayloadAction<number>) {
       state.detailOverlay.buttonIndex = action.payload;
+    },
+    setDetailZone(state, action: PayloadAction<'buttons' | 'seasons' | 'episodes'>) {
+      state.detailOverlay.zone = action.payload;
+    },
+    setDetailSeasonIndex(state, action: PayloadAction<number>) {
+      state.detailOverlay.seasonIndex = action.payload;
+    },
+    setDetailEpisodeIndex(state, action: PayloadAction<number>) {
+      state.detailOverlay.episodeIndex = action.payload;
     },
     togglePerfHud(state) {
       state.perfHudVisible = !state.perfHudVisible;
@@ -104,6 +126,7 @@ export const uiSlice = createSlice({
 
 export const {
   openDetail, closeDetail, setDetailButtonIndex, togglePerfHud,
+  setDetailZone, setDetailSeasonIndex, setDetailEpisodeIndex,
   setActivePage, setNavFocused, setNavIndex,
   setSearchQuery, appendSearchChar, deleteSearchChar, clearSearchQuery,
   setHeroFocused, setHeroButtonIndex, setInteractionMode,

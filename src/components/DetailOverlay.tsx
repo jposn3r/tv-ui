@@ -6,7 +6,7 @@ import { toggleWatchlist } from '../state/slices/watchlistSlice';
 import { setTrailerPaused } from '../state/slices/trailerSlice';
 import { getTileImageUrl } from '../data/mockContent';
 import { getTmdbBackdropUrl, getTmdbLogoUrl } from '../data/tmdb';
-import { fetchTrailerKey } from '../data/tmdb';
+import { fetchTrailerKey, fetchTvSeasons, fetchEpisodes } from '../data/tmdb';
 import { overlayStyles } from '../styles/componentStyles/overlayStyles';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { easeOut } from '../engine/easing';
@@ -20,7 +20,7 @@ import type { CSSProperties } from 'react';
 
 export const DetailOverlay = memo(function DetailOverlay() {
   const dispatch = useDispatch();
-  const { open, tile, buttonIndex } = useSelector(selectDetailOverlay);
+  const { open, tile, buttonIndex, zone, seasonIndex, episodeIndex } = useSelector(selectDetailOverlay);
   const watchlist = useSelector(selectWatchlist);
   const trailerMuted = useSelector(selectTrailerMuted);
   const currentProfileId = useSelector(selectCurrentProfileId);
@@ -47,6 +47,20 @@ export const DetailOverlay = memo(function DetailOverlay() {
     });
     return () => { cancelled = true; };
   }, [open, tile?.tmdbId, tile?.mediaType, settings.disableAutoplay]);
+
+  // Pre-warm season + first season's episode caches when opening a TV show overlay,
+  // so the input navigation handler can synchronously read counts and switch zones.
+  useEffect(() => {
+    if (!open || !tile?.tmdbId || tile.mediaType !== 'tv') return;
+    let cancelled = false;
+    const tvId = tile.tmdbId;
+    fetchTvSeasons(tvId).then((seasons) => {
+      if (cancelled || seasons.length === 0) return;
+      // Also pre-fetch the first season's episodes
+      fetchEpisodes(tvId, seasons[0].seasonNumber);
+    });
+    return () => { cancelled = true; };
+  }, [open, tile?.tmdbId, tile?.mediaType]);
 
   const slideAnim = useScrollAnimation('detail-slide', 100);
 
@@ -173,10 +187,14 @@ export const DetailOverlay = memo(function DetailOverlay() {
             <div style={{ color: '#fff', fontSize: 14, lineHeight: 1.5, opacity: 0.9, marginBottom: 20, fontFamily: theme.typography.fontFamily }}>
               {tile.synopsis}
             </div>
-            {/* Action buttons */}
+            {/* Action buttons — only highlight when the buttons zone has focus */}
             <div style={{ display: 'flex', gap: 12 }}>
               {BUTTONS.map((label, i) => (
-                <button key={label} style={overlayStyles.button(i === buttonIndex)} tabIndex={-1}>
+                <button
+                  key={label}
+                  style={overlayStyles.button(zone === 'buttons' && i === buttonIndex)}
+                  tabIndex={-1}
+                >
                   {label}
                 </button>
               ))}
@@ -192,9 +210,16 @@ export const DetailOverlay = memo(function DetailOverlay() {
           </span>
         </div>
 
-        {/* Episode browser for TV shows */}
+        {/* Episode browser for TV shows. Focus state comes from Redux when the user
+            navigates with arrow keys — seasons zone tracks seasonIndex with episode = -1,
+            episodes zone tracks episodeIndex with the active season selected. */}
         {isTvShow && tile.tmdbId && (
-          <EpisodeBrowser tvId={tile.tmdbId} isTv={true} />
+          <EpisodeBrowser
+            tvId={tile.tmdbId}
+            isTv={true}
+            focusedSeason={seasonIndex}
+            focusedEpisode={zone === 'episodes' ? episodeIndex : -1}
+          />
         )}
       </div>
     );

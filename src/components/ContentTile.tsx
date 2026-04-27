@@ -323,8 +323,16 @@ export const ContentTile = memo(function ContentTile({
               borderRadius: 3, background: 'rgba(0,0,0,0.6)', color: '#fff',
               fontSize: 10, fontWeight: 500, opacity: 0.7, pointerEvents: 'none',
               display: 'flex', alignItems: 'center', gap: 4,
+              fontFamily: 'ui-monospace, SF Mono, Menlo, monospace',
             }}>
-              {trailerMuted ? '🔇' : '🔊'} M
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                minWidth: 12, height: 12, padding: '0 3px', borderRadius: 2,
+                background: 'rgba(255,255,255,0.15)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                fontSize: 9, fontWeight: 600,
+              }}>P</span>
+              <span style={{ fontFamily: theme.typography.fontFamily }}>to pause</span>
             </div>
           )}
         </div>

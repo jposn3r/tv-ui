@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { theme } from '../styles/theme';
 import { fetchTvSeasons, fetchEpisodes, getTmdbStillUrl } from '../data/tmdb';
 import type { SeasonSummary, Episode } from '../data/tmdb';
@@ -16,6 +16,8 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
   const [activeSeason, setActiveSeason] = useState(0);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [loading, setLoading] = useState(true);
+  const focusedEpisodeRef = useRef<HTMLDivElement>(null);
+  const seasonTabsRef = useRef<HTMLDivElement>(null);
 
   // Fetch seasons on mount
   useEffect(() => {
@@ -49,6 +51,17 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
     return () => { cancelled = true; };
   }, [tvId, activeSeason, seasons]);
 
+  // Scroll the focused episode into view when navigating in TV mode
+  useEffect(() => {
+    if (!isTv) return;
+    if (focusedEpisode >= 0 && focusedEpisodeRef.current) {
+      focusedEpisodeRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    } else if (focusedEpisode === -1 && seasonTabsRef.current) {
+      // Seasons zone — scroll the tab row into view
+      seasonTabsRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [isTv, focusedEpisode, focusedSeason]);
+
   if (loading || seasons.length === 0) return null;
 
   const container: CSSProperties = {
@@ -68,7 +81,7 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
     <div style={container}>
       {/* Season tabs */}
       <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 12 }}>Episodes</div>
-      <div style={seasonTabs as CSSProperties}>
+      <div ref={seasonTabsRef} style={seasonTabs as CSSProperties}>
         {seasons.map((s, i) => {
           const isActive = i === activeSeason;
           const isFocusedTab = isTv && focusedEpisode === -1 && i === focusedSeason;
@@ -109,7 +122,11 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
           };
 
           return (
-            <div key={ep.episodeNumber} style={epStyle}>
+            <div
+              key={ep.episodeNumber}
+              ref={isFocusedEp ? focusedEpisodeRef : null}
+              style={epStyle}
+            >
               {/* Episode thumbnail */}
               <div style={{
                 width: isTv ? 180 : 140,

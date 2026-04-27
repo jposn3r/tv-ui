@@ -42,13 +42,14 @@ export const heroStyles = createStyles({
     zIndex: 2,
   },
 
-  textContainer: (dimmed: boolean) => ({
+  textContainer: (hidden: boolean) => ({
     position: 'absolute' as const,
     bottom: 60,
     left: theme.spacing.edgePadding,
     maxWidth: 500,
     zIndex: 3,
-    opacity: dimmed ? 0.5 : 1,
+    opacity: hidden ? 0 : 1,
+    pointerEvents: (hidden ? 'none' : 'auto') as 'none' | 'auto',
     transition: `opacity ${theme.animation.trailerFadeMs}ms ease-out`,
   }),
 
@@ -99,25 +100,42 @@ export const heroStyles = createStyles({
     letterSpacing: 0.5,
   }),
 
-  muteIndicator: (visible: boolean) => ({
+  pauseHint: (visible: boolean) => ({
     position: 'absolute' as const,
     bottom: 16,
     right: 24,
     zIndex: 4,
     display: 'flex' as const,
     alignItems: 'center' as const,
-    gap: 6,
-    padding: '6px 12px',
-    borderRadius: 4,
+    gap: 8,
+    padding: '8px 14px',
+    borderRadius: 6,
     background: 'rgba(0, 0, 0, 0.6)',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
+    border: '1px solid rgba(255, 255, 255, 0.18)',
     color: theme.colors.text,
     fontSize: 12,
     fontWeight: 500,
-    opacity: visible ? 0.8 : 0,
+    opacity: visible ? 0.85 : 0,
     transition: 'opacity 300ms ease-out',
     pointerEvents: 'none' as const,
+    fontFamily: theme.typography.fontFamily,
   }),
+
+  pauseKbd: {
+    display: 'inline-flex' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    minWidth: 18,
+    height: 18,
+    padding: '0 5px',
+    borderRadius: 3,
+    background: 'rgba(255, 255, 255, 0.15)',
+    border: '1px solid rgba(255, 255, 255, 0.3)',
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 600,
+    fontFamily: 'ui-monospace, SF Mono, Menlo, monospace',
+  },
 
   videoLayer: (playing: boolean) => ({
     zIndex: 1,

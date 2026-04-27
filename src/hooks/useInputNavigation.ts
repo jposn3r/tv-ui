@@ -16,6 +16,9 @@ import {
   clearSearchQuery,
   setHeroFocused,
   setHeroButtonIndex,
+  setDetailZone,
+  setDetailSeasonIndex,
+  setDetailEpisodeIndex,
 } from '../state/slices/uiSlice';
 import {
   setContent,
@@ -42,7 +45,7 @@ import {
 import { DETAIL_BUTTON_COUNT, HERO_BUTTON_COUNT, KEYBOARD_GRID, KEYBOARD_COLS } from '../utils/constants';
 import { NAV_ITEMS } from '../data/pageConfigs';
 import { PAGE_CONFIGS } from '../data/pageConfigs';
-import { fetchRowsFromConfigs, fetchLogosProgressive, searchTmdb } from '../data/tmdb';
+import { fetchRowsFromConfigs, fetchLogosProgressive, searchTmdb, getCachedSeasons, getCachedEpisodes } from '../data/tmdb';
 import { generateMockContent } from '../data/mockContent';
 import type { PageId } from '../state/slices/uiSlice';
 
@@ -384,24 +387,70 @@ export function useInputNavigation() {
     });
 
     input.start((action) => {
-      const ov = overlayRef.current;
+      // Read overlay state directly from the store every action so back-to-back
+      // dispatches always see the latest values (overlayRef only updates on render).
+      const ov = store.getState().ui.detailOverlay;
       if (ov.open) {
-        if (action === 'LEFT') {
-          dispatch(setDetailButtonIndex(Math.max(0, ov.buttonIndex - 1)));
-        } else if (action === 'RIGHT') {
-          dispatch(setDetailButtonIndex(Math.min(DETAIL_BUTTON_COUNT - 1, ov.buttonIndex + 1)));
-        } else if (action === 'SELECT') {
-          // Button index 1 = Add/Remove from List
-          if (ov.buttonIndex === 1 && ov.tile) {
-            const profileId = store.getState().profile.currentProfileId;
-            if (profileId) {
-              dispatch(toggleWatchlist({ profileId, tile: ov.tile }));
+        const isTvShow = ov.tile?.mediaType === 'tv';
+        const tvId = ov.tile?.tmdbId;
+        const seasons = isTvShow && tvId ? getCachedSeasons(tvId) : [];
+        const episodes = isTvShow && tvId ? getCachedEpisodes(tvId, seasons[ov.seasonIndex]?.seasonNumber ?? 1) : [];
+        const hasSeasons = seasons.length > 0;
+        const hasEpisodes = episodes.length > 0;
+
+        if (action === 'BACK') {
+          dispatch(closeDetail()); dispatch(setTrailerPaused(false));
+          return;
+        }
+
+        // --- ZONE: BUTTONS (Play / Add / Like) ---
+        if (ov.zone === 'buttons') {
+          if (action === 'LEFT') {
+            dispatch(setDetailButtonIndex(Math.max(0, ov.buttonIndex - 1)));
+          } else if (action === 'RIGHT') {
+            dispatch(setDetailButtonIndex(Math.min(DETAIL_BUTTON_COUNT - 1, ov.buttonIndex + 1)));
+          } else if (action === 'DOWN' && hasSeasons) {
+            dispatch(setDetailZone('seasons'));
+          } else if (action === 'SELECT') {
+            if (ov.buttonIndex === 1 && ov.tile) {
+              const profileId = store.getState().profile.currentProfileId;
+              if (profileId) dispatch(toggleWatchlist({ profileId, tile: ov.tile }));
             }
           }
-        } else if (action === 'BACK') {
-          dispatch(closeDetail()); dispatch(setTrailerPaused(false));
+          return;
         }
-        return;
+
+        // --- ZONE: SEASONS (tab row) ---
+        if (ov.zone === 'seasons') {
+          if (action === 'LEFT') {
+            dispatch(setDetailSeasonIndex(Math.max(0, ov.seasonIndex - 1)));
+          } else if (action === 'RIGHT') {
+            dispatch(setDetailSeasonIndex(Math.min(seasons.length - 1, ov.seasonIndex + 1)));
+          } else if (action === 'UP') {
+            dispatch(setDetailZone('buttons'));
+          } else if (action === 'DOWN' && hasEpisodes) {
+            dispatch(setDetailZone('episodes'));
+            dispatch(setDetailEpisodeIndex(0));
+          } else if (action === 'SELECT' && hasEpisodes) {
+            dispatch(setDetailZone('episodes'));
+            dispatch(setDetailEpisodeIndex(0));
+          }
+          return;
+        }
+
+        // --- ZONE: EPISODES (vertical list) ---
+        if (ov.zone === 'episodes') {
+          if (action === 'UP') {
+            if (ov.episodeIndex === 0) {
+              dispatch(setDetailZone('seasons'));
+            } else {
+              dispatch(setDetailEpisodeIndex(ov.episodeIndex - 1));
+            }
+          } else if (action === 'DOWN') {
+            dispatch(setDetailEpisodeIndex(Math.min(episodes.length - 1, ov.episodeIndex + 1)));
+          }
+          return;
+        }
       }
 
       // Hero focused — handle navigation between hero buttons

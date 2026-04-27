@@ -388,6 +388,16 @@ interface TmdbSeasonResponse {
 const tvDetailCache = new Map<number, SeasonSummary[]>();
 const episodeCache = new Map<string, Episode[]>();
 
+/** Synchronously read the cached season list (returns [] if not yet fetched). */
+export function getCachedSeasons(tvId: number): SeasonSummary[] {
+  return tvDetailCache.get(tvId) ?? [];
+}
+
+/** Synchronously read the cached episode list for a season (returns [] if not yet fetched). */
+export function getCachedEpisodes(tvId: number, seasonNumber: number): Episode[] {
+  return episodeCache.get(`${tvId}-${seasonNumber}`) ?? [];
+}
+
 export async function fetchTvSeasons(tvId: number): Promise<SeasonSummary[]> {
   const cached = tvDetailCache.get(tvId);
   if (cached) return cached;

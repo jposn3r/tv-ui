@@ -201,8 +201,9 @@ export const HeroBanner = memo(function HeroBanner() {
         </div>
       </div>
 
-      <div style={heroStyles.muteIndicator(!!videoVisible && videoPlaying)}>
-        {trailerMuted ? '🔇' : '🔊'} Press M
+      <div style={heroStyles.pauseHint(!!videoVisible && videoPlaying)}>
+        <span style={heroStyles.pauseKbd}>P</span>
+        <span>to pause</span>
       </div>
     </div>
   );
