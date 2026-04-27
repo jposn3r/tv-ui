@@ -21,6 +21,7 @@ export function EpisodeBrowser({ tvId, isTv, focusedZone = null, focusedSeason =
   const [loading, setLoading] = useState(true);
   const focusedEpisodeRef = useRef<HTMLDivElement>(null);
   const seasonTabsRef = useRef<HTMLDivElement>(null);
+  const focusedSeasonTabRef = useRef<HTMLButtonElement>(null);
 
   // Fetch seasons on mount
   useEffect(() => {
@@ -62,8 +63,12 @@ export function EpisodeBrowser({ tvId, isTv, focusedZone = null, focusedSeason =
     if (!isTv) return;
     if (focusedZone === 'episodes' && focusedEpisodeRef.current) {
       focusedEpisodeRef.current.scrollIntoView({ block: 'nearest', behavior: 'auto' });
-    } else if (focusedZone === 'seasons' && seasonTabsRef.current) {
-      seasonTabsRef.current.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+    } else if (focusedZone === 'seasons') {
+      // Bring the row into view vertically AND scroll the focused tab horizontally
+      // within the tab row so it never falls off the right edge for shows with
+      // many seasons.
+      seasonTabsRef.current?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+      focusedSeasonTabRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
     }
   }, [isTv, focusedZone, focusedEpisode, focusedSeason]);
 
@@ -112,10 +117,18 @@ export function EpisodeBrowser({ tvId, isTv, focusedZone = null, focusedSeason =
             flexShrink: 0,
             fontFamily: theme.typography.fontFamily,
             outline: 'none',
-            transition: 'background 120ms ease-out, border-color 120ms ease-out, box-shadow 120ms ease-out, color 120ms ease-out',
+            // No transition on the focus-indicating properties (border, shadow) so
+            // rapid LEFT/RIGHT presses always show the ring at full intensity.
+            // Background/color transitions are still subtle (60ms) for a tactile feel.
+            transition: 'background 60ms ease-out, color 60ms ease-out',
           };
           return (
-            <button key={s.seasonNumber} style={tabStyle} onClick={() => !isTv && setActiveSeason(i)}>
+            <button
+              key={s.seasonNumber}
+              ref={isFocusedTab ? focusedSeasonTabRef : null}
+              style={tabStyle}
+              onClick={() => !isTv && setActiveSeason(i)}
+            >
               {s.name}
             </button>
           );
@@ -146,7 +159,9 @@ export function EpisodeBrowser({ tvId, isTv, focusedZone = null, focusedSeason =
               ? '0 0 0 1px rgba(255,255,255,0.4), 0 0 20px rgba(255,255,255,0.25), 0 6px 20px rgba(0,0,0,0.5)'
               : 'none',
             outline: 'none',
-            transition: 'background 120ms ease-out, border-color 120ms ease-out, box-shadow 120ms ease-out',
+            // No transition on focus-indicating properties — rapid DOWN presses
+            // need instant visual feedback or the ring looks half-rendered.
+            transition: 'background 60ms ease-out',
             cursor: isTv ? 'default' : 'pointer',
           };
 
