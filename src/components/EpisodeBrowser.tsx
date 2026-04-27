@@ -16,7 +16,13 @@ interface EpisodeBrowserProps {
 
 export function EpisodeBrowser({ tvId, isTv, focusedZone = null, focusedSeason = 0, focusedEpisode = -1 }: EpisodeBrowserProps) {
   const [seasons, setSeasons] = useState<SeasonSummary[]>([]);
-  const [activeSeason, setActiveSeason] = useState(0);
+  // Web mode tracks the user's clicked season locally. TV mode derives it
+  // from `focusedSeason` so there's NO render where the visible "active" tab
+  // is one frame behind the focused tab. (That lag was the bug — for one
+  // frame after a LEFT/RIGHT press, both the old and new tab looked
+  // highlighted because the active state hadn't caught up yet.)
+  const [webActiveSeason, setWebActiveSeason] = useState(0);
+  const activeSeason = isTv ? Math.max(0, Math.min(focusedSeason, Math.max(0, seasons.length - 1))) : webActiveSeason;
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [loading, setLoading] = useState(true);
   const focusedEpisodeRef = useRef<HTMLDivElement>(null);
@@ -29,21 +35,14 @@ export function EpisodeBrowser({ tvId, isTv, focusedZone = null, focusedSeason =
     fetchTvSeasons(tvId).then((s) => {
       if (!cancelled && s.length > 0) {
         setSeasons(s);
-        setActiveSeason(0);
+        setWebActiveSeason(0);
       }
       setLoading(false);
     });
     return () => { cancelled = true; };
   }, [tvId]);
 
-  // Sync focused season from TV navigation
-  useEffect(() => {
-    if (isTv && focusedSeason >= 0 && focusedSeason < seasons.length) {
-      setActiveSeason(focusedSeason);
-    }
-  }, [isTv, focusedSeason, seasons.length]);
-
-  // Fetch episodes when season changes
+  // Fetch episodes when active season changes
   useEffect(() => {
     if (seasons.length === 0) return;
     const season = seasons[activeSeason];
@@ -127,7 +126,7 @@ export function EpisodeBrowser({ tvId, isTv, focusedZone = null, focusedSeason =
               key={s.seasonNumber}
               ref={isFocusedTab ? focusedSeasonTabRef : null}
               style={tabStyle}
-              onClick={() => !isTv && setActiveSeason(i)}
+              onClick={() => !isTv && setWebActiveSeason(i)}
             >
               {s.name}
             </button>
