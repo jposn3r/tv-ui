@@ -114,10 +114,12 @@ export function EpisodeBrowser({ tvId, isTv, focusedSeason = 0, focusedEpisode =
             display: 'flex',
             gap: 16,
             padding: 12,
-            borderRadius: 6,
-            background: isFocusedEp ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
-            border: isFocusedEp ? '1px solid rgba(255,255,255,0.3)' : '1px solid transparent',
-            transition: 'background 150ms, border 150ms',
+            borderRadius: 8,
+            background: isFocusedEp ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
+            // Solid white 2px border + subtle outer glow when focused.
+            border: isFocusedEp ? '2px solid #ffffff' : '2px solid transparent',
+            boxShadow: isFocusedEp ? '0 0 0 1px rgba(255,255,255,0.15), 0 4px 16px rgba(0,0,0,0.4)' : 'none',
+            transition: 'background 150ms ease-out, border-color 150ms ease-out, box-shadow 150ms ease-out',
             cursor: isTv ? 'default' : 'pointer',
           };
 
