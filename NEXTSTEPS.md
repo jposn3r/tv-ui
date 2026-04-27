@@ -2,6 +2,26 @@
 
 Iteration plan for the three UI modes: Web, Mobile, and TV.
 
+## Polish Pass — Tonight
+
+### Trailer UX / UI
+- [ ] **Top-left chrome leak**: residual YouTube UI still visible in the upper-left corner of trailers (likely the watermark or share/save icons that pop in on hover). Investigate whether it's the player itself or our mask not extending far enough left, and decide between widening the top mask, adding a small left mask, or detecting & blocking via JS.
+- [ ] Verify the masks behave consistently across hero (large), detail-overlay (medium), and tile (small ~264x149) — each may need its own crop ratio.
+- [ ] Consider replacing the IFrame embed with a custom HTML5 player using youtube-dl-style direct stream URLs for full chrome control (research feasibility / TOS).
+- [ ] Smooth crossfade between backdrop and trailer on trailer-start (currently a hard cut once `videoPlaying` flips).
+- [ ] Trailer end behavior: fade out cleanly back to backdrop instead of the current onEnded → showTrailer:false pop.
+- [ ] "P to pause" hint timing: only show after the user has been on the trailer for a couple seconds, fade out after another few — don't show it constantly.
+
+### TV Focus State Management
+- [ ] Audit every focusable surface in TV mode and confirm it has exactly one path in / out (Hero buttons, Nav items, Content tiles, Search keyboard, Detail buttons, Detail seasons, Detail episodes, Settings rail, Avatar dropdown panel, Welcome modal).
+- [ ] Settings page in TV mode: needs a real focus model. Right now the page renders but has no D-pad navigation — toggles can't be flipped via keyboard.
+- [ ] Avatar dropdown side panel (TV): focus model for the panel rows (Switch profile / Manage / Settings / Sign Out) is incomplete. Currently relies on click handlers.
+- [ ] Profile selection screen TV nav: works but jumps through tabs feel rough — tighten up the focus model so DOWN from a profile tile always lands on Manage Profiles, etc.
+- [ ] Search page on-screen keyboard: focus indicator on individual keys when in TV mode is currently subtle — bump to match the bright-white-border style we have on episodes/seasons.
+- [ ] Hero banner button focus glow: less prominent than the new episode focus ring — make consistent across the app.
+- [ ] Add a single shared `<FocusFrame>` primitive that all focusable surfaces use, so the visual treatment (3px white border + glow + no transitions) is defined in one place instead of repeated inline.
+- [ ] Test rapid arrow-key spam on every screen and confirm no stuck focus / multi-focus / off-screen focus states.
+
 ## Web Mode Iterations
 
 - [ ] Hover card delay tuning (400ms show, instant hide) and portal rendering for z-index
