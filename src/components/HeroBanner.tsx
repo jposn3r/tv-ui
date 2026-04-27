@@ -14,14 +14,18 @@ import { setActiveTrailer } from '../state/slices/trailerSlice';
 import { openDetail } from '../state/slices/uiSlice';
 import { toggleWatchlist } from '../state/slices/watchlistSlice';
 import { setTrailerPaused } from '../state/slices/trailerSlice';
+import { selectCurrentProfileId } from '../state/selectors';
 import { YouTubePlayer } from './YouTubePlayer';
 import { useIsTvMode } from '../hooks/useMode';
+import { useSettings } from '../hooks/useSettings';
 
 const HERO_BUTTONS = ['▶  Play', '+ Add to List'];
 
 export const HeroBanner = memo(function HeroBanner() {
   const dispatch = useDispatch();
   const isTv = useIsTvMode();
+  const currentProfileId = useSelector(selectCurrentProfileId);
+  const settings = useSettings();
   const focus = useSelector(selectFocus);
   const rows = useSelector(selectRows);
   const trailerMuted = useSelector(selectTrailerMuted);
@@ -40,9 +44,11 @@ export const HeroBanner = memo(function HeroBanner() {
 
   // Should the hero trailer be active?
   // TV: when hero is focused. Web: autoplay after delay.
-  const shouldPlayTrailer = isTv
+  // Disabled entirely if user opted out of autoplay in settings.
+  const autoplayAllowed = !settings.disableAutoplay;
+  const shouldPlayTrailer = autoplayAllowed && (isTv
     ? (heroFocused && !tileTrailerPlaying && !trailerPaused)
-    : !trailerPaused;
+    : !trailerPaused);
 
   // Fetch trailer key when hero becomes focused (with delay)
   useEffect(() => {
@@ -177,8 +183,8 @@ export const HeroBanner = memo(function HeroBanner() {
                   if (i === 0) {
                     dispatch(openDetail(firstTile));
                     dispatch(setTrailerPaused(true));
-                  } else {
-                    dispatch(toggleWatchlist(firstTile));
+                  } else if (currentProfileId) {
+                    dispatch(toggleWatchlist({ profileId: currentProfileId, tile: firstTile }));
                   }
                 }
               }}

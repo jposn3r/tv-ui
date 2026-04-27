@@ -10,6 +10,7 @@ import { NavBar } from './NavBar';
 import { MobileNavBar } from './MobileNavBar';
 import { SearchPage } from './SearchPage';
 import { MyListPage } from './MyListPage';
+import { SettingsPage } from './settings/SettingsPage';
 import { PerformanceHUD } from './PerformanceHUD';
 import { WelcomeModal } from './WelcomeModal';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
@@ -17,6 +18,9 @@ import { easeOutQuint } from '../engine/easing';
 import { useResponsive } from '../hooks/useResponsive';
 import { KEYBOARD_GRID, KEYBOARD_COLS, ROW_BUFFER } from '../utils/constants';
 import { useIsTvMode } from '../hooks/useMode';
+import { useSettings } from '../hooks/useSettings';
+import { useDispatch } from 'react-redux';
+import { setActivePage } from '../state/slices/uiSlice';
 
 const KEYBOARD_ROW_COUNT = Math.ceil(KEYBOARD_GRID.length / KEYBOARD_COLS);
 const HERO_SLOT_HEIGHT = '56vh';
@@ -30,9 +34,19 @@ export function Shell() {
   const shellRef = useRef<HTMLDivElement>(null);
   const isTv = useIsTvMode();
   const { isMobile } = useResponsive();
+  const settings = useSettings();
+  const dispatch = useDispatch();
 
   const isSearch = activePage === 'search';
   const isMyList = activePage === 'myList';
+  const isSettings = activePage === 'settings';
+
+  // If My List is disabled and user is on it, bounce them home
+  useEffect(() => {
+    if (isMyList && settings.disableMyList) {
+      dispatch(setActivePage('home'));
+    }
+  }, [isMyList, settings.disableMyList, dispatch]);
 
   // ScrollEngine-driven vertical scroll (TV mode only)
   const contentScroll = useScrollAnimation('vertical-content', 0);
@@ -105,6 +119,8 @@ export function Shell() {
           </div>
         ) : isMyList ? (
           <MyListPage />
+        ) : isSettings ? (
+          <SettingsPage />
         ) : (
           <>
             {!isMobile && <HeroBanner />}
@@ -134,6 +150,8 @@ export function Shell() {
         </div>
       ) : isMyList ? (
         <MyListPage />
+      ) : isSettings ? (
+        <SettingsPage />
       ) : (
         <>
           <div style={{ height: HERO_SLOT_HEIGHT, overflow: 'hidden', flexShrink: 0 }}>

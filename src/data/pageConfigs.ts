@@ -3,7 +3,7 @@ import type { PageId } from '../state/slices/uiSlice';
 
 const BASE = 'https://api.themoviedb.org/3';
 
-export const PAGE_CONFIGS: Record<Exclude<PageId, 'myList' | 'search'>, RowConfig[]> = {
+export const PAGE_CONFIGS: Record<Exclude<PageId, 'myList' | 'search' | 'settings'>, RowConfig[]> = {
   home: [
     { title: 'Trending Now', url: `${BASE}/trending/all/week` },
     { title: 'Popular Movies', url: `${BASE}/movie/popular` },

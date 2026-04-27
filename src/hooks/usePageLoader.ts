@@ -19,7 +19,7 @@ export function usePageLoader() {
       dispatch(setSearchResults([]));
       return;
     }
-    if (pageId === 'myList') return;
+    if (pageId === 'myList' || pageId === 'settings') return;
 
     if (pageCache[pageId]) {
       dispatch(switchPage(pageId));

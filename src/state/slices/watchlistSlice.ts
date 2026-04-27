@@ -2,33 +2,46 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { TileData } from './contentSlice';
 
 interface WatchlistState {
-  items: TileData[];
+  /** Watchlist items keyed by profileId. */
+  byProfile: Record<string, TileData[]>;
 }
 
 const initialState: WatchlistState = {
-  items: [],
+  byProfile: {},
 };
 
 export const watchlistSlice = createSlice({
   name: 'watchlist',
   initialState,
   reducers: {
-    hydrateWatchlist(state, action: PayloadAction<TileData[]>) {
-      state.items = action.payload;
+    hydrateWatchlist(state, action: PayloadAction<{ byProfile: Record<string, TileData[]> }>) {
+      state.byProfile = action.payload.byProfile;
     },
-    toggleWatchlist(state, action: PayloadAction<TileData>) {
-      const idx = state.items.findIndex((t) => t.id === action.payload.id);
+    toggleWatchlist(state, action: PayloadAction<{ profileId: string; tile: TileData }>) {
+      const { profileId, tile } = action.payload;
+      if (!state.byProfile[profileId]) state.byProfile[profileId] = [];
+      const list = state.byProfile[profileId];
+      const idx = list.findIndex((t) => t.id === tile.id);
       if (idx >= 0) {
-        state.items.splice(idx, 1);
+        list.splice(idx, 1);
       } else {
-        state.items.unshift(action.payload);
+        list.unshift(tile);
       }
     },
-    clearWatchlist(state) {
-      state.items = [];
+    clearWatchlist(state, action: PayloadAction<string>) {
+      // payload is profileId
+      state.byProfile[action.payload] = [];
+    },
+    removeProfileWatchlist(state, action: PayloadAction<string>) {
+      delete state.byProfile[action.payload];
     },
   },
 });
 
-export const { hydrateWatchlist, toggleWatchlist, clearWatchlist } = watchlistSlice.actions;
+export const {
+  hydrateWatchlist,
+  toggleWatchlist,
+  clearWatchlist,
+  removeProfileWatchlist,
+} = watchlistSlice.actions;
 export default watchlistSlice.reducer;

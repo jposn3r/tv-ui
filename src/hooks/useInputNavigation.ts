@@ -79,7 +79,9 @@ export function useInputNavigation() {
 
   // Build engine row descriptors for the My List page
   const buildMyListRows = useCallback(() => {
-    const items = store.getState().watchlist.items;
+    const state = store.getState();
+    const profileId = state.profile.currentProfileId;
+    const items = profileId ? (state.watchlist.byProfile[profileId] ?? []) : [];
     const row0 = items.length > 0
       ? { id: 'mylist-items', tileCount: items.length }
       : { id: 'mylist-cta', tileCount: 1 };
@@ -127,7 +129,7 @@ export function useInputNavigation() {
       return;
     }
 
-    if (pageId === 'myList' || pageId === 'search') return;
+    if (pageId === 'myList' || pageId === 'search' || pageId === 'settings') return;
 
     const configs = PAGE_CONFIGS[pageId];
     if (!configs) return;
@@ -343,7 +345,8 @@ export function useInputNavigation() {
       if (activePageRef.current === 'myList') {
         // Row 1 = Clear All Saved Data button
         if (pos.rowIndex === 1) {
-          dispatch(clearWatchlist());
+          const profileId = store.getState().profile.currentProfileId;
+          if (profileId) dispatch(clearWatchlist(profileId));
           clearAllAppData();
           return;
         }
@@ -373,6 +376,10 @@ export function useInputNavigation() {
     engine.onBack(() => {
       if (overlayRef.current.open) {
         dispatch(closeDetail()); dispatch(setTrailerPaused(false));
+      } else if (activePageRef.current === 'settings') {
+        // BACK from settings page returns to home
+        dispatch(setActivePage('home'));
+        loadPage('home');
       }
     });
 
@@ -386,7 +393,10 @@ export function useInputNavigation() {
         } else if (action === 'SELECT') {
           // Button index 1 = Add/Remove from List
           if (ov.buttonIndex === 1 && ov.tile) {
-            dispatch(toggleWatchlist(ov.tile));
+            const profileId = store.getState().profile.currentProfileId;
+            if (profileId) {
+              dispatch(toggleWatchlist({ profileId, tile: ov.tile }));
+            }
           }
         } else if (action === 'BACK') {
           dispatch(closeDetail()); dispatch(setTrailerPaused(false));

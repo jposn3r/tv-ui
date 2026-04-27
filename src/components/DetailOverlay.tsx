@@ -1,6 +1,6 @@
 import { memo, useEffect, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectDetailOverlay, selectWatchlist, selectTrailerMuted } from '../state/selectors';
+import { selectDetailOverlay, selectWatchlist, selectTrailerMuted, selectCurrentProfileId } from '../state/selectors';
 import { closeDetail } from '../state/slices/uiSlice';
 import { toggleWatchlist } from '../state/slices/watchlistSlice';
 import { setTrailerPaused } from '../state/slices/trailerSlice';
@@ -14,6 +14,7 @@ import { mergeStyles } from '../styles/styleEngine';
 import { YouTubePlayer } from './YouTubePlayer';
 import { EpisodeBrowser } from './EpisodeBrowser';
 import { useIsTvMode, useIsWebMode } from '../hooks/useMode';
+import { useSettings } from '../hooks/useSettings';
 import { theme } from '../styles/theme';
 import type { CSSProperties } from 'react';
 
@@ -22,16 +23,20 @@ export const DetailOverlay = memo(function DetailOverlay() {
   const { open, tile, buttonIndex } = useSelector(selectDetailOverlay);
   const watchlist = useSelector(selectWatchlist);
   const trailerMuted = useSelector(selectTrailerMuted);
+  const currentProfileId = useSelector(selectCurrentProfileId);
+  const settings = useSettings();
   const isTv = useIsTvMode();
   const isWeb = useIsWebMode();
   const inList = !!tile && watchlist.some((t) => t.id === tile.id);
-  const BUTTONS = ['Play', inList ? 'Remove from List' : 'Add to List', 'Like'];
+  const BUTTONS = settings.disableMyList
+    ? ['Play', 'Like']
+    : ['Play', inList ? 'Remove from List' : 'Add to List', 'Like'];
 
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [, setVideoPlaying] = useState(false);
 
   useEffect(() => {
-    if (!open || !tile?.tmdbId || !tile?.mediaType) {
+    if (!open || !tile?.tmdbId || !tile?.mediaType || settings.disableAutoplay) {
       setTrailerKey(null);
       setVideoPlaying(false);
       return;
@@ -41,7 +46,7 @@ export const DetailOverlay = memo(function DetailOverlay() {
       if (!cancelled) setTrailerKey(key);
     });
     return () => { cancelled = true; };
-  }, [open, tile?.tmdbId, tile?.mediaType]);
+  }, [open, tile?.tmdbId, tile?.mediaType, settings.disableAutoplay]);
 
   const slideAnim = useScrollAnimation('detail-slide', 100);
 
@@ -63,11 +68,11 @@ export const DetailOverlay = memo(function DetailOverlay() {
   }, [isWeb, handleClose]);
 
   const handleButtonClick = useCallback((label: string) => {
-    if (!isWeb || !tile) return;
+    if (!isWeb || !tile || !currentProfileId) return;
     if (label === 'Add to List' || label === 'Remove from List') {
-      dispatch(toggleWatchlist(tile));
+      dispatch(toggleWatchlist({ profileId: currentProfileId, tile }));
     }
-  }, [dispatch, isWeb, tile]);
+  }, [dispatch, isWeb, tile, currentProfileId]);
 
   // Web mode: close on Escape
   useEffect(() => {

@@ -2,20 +2,59 @@ import type { Store } from '@reduxjs/toolkit';
 import type { RootState } from './store';
 import { hydrateWatchlist } from './slices/watchlistSlice';
 import { setInteractionMode, type InteractionMode } from './slices/uiSlice';
+import { hydrateAuth } from './slices/authSlice';
+import { hydrateProfiles } from './slices/profileSlice';
+import { hydrateSettings } from './slices/settingsSlice';
 import type { TileData } from './slices/contentSlice';
+import type { Account } from './slices/authSlice';
+import type { Profile } from './slices/profileSlice';
+import type { ProfileSettings } from './slices/settingsSlice';
 
-const STORAGE_KEY = 'tvui:watchlist:v1';
+const WATCHLIST_KEY = 'tvui:watchlist:v2'; // bumped from v1 (now keyed by profile)
+const LEGACY_WATCHLIST_KEY = 'tvui:watchlist:v1';
 const MODE_KEY = 'tvui:mode:v1';
+const AUTH_KEY = 'tvui:auth:v1';
+const PROFILES_KEY = 'tvui:profiles:v1';
+const SETTINGS_KEY = 'tvui:settings:v1';
 
-export function loadWatchlist(): TileData[] {
+function safeRead<T>(key: string, fallback: T, validate?: (parsed: unknown) => boolean): T {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (validate && !validate(parsed)) return fallback;
+    return parsed as T;
   } catch {
-    return [];
+    return fallback;
   }
+}
+
+function safeWrite(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // quota / privacy mode — ignore
+  }
+}
+
+export function loadWatchlist(): Record<string, TileData[]> {
+  const v2 = safeRead<Record<string, TileData[]>>(
+    WATCHLIST_KEY,
+    {},
+    (p) => typeof p === 'object' && p !== null && !Array.isArray(p)
+  );
+  if (Object.keys(v2).length > 0) return v2;
+  // Migration: legacy v1 (flat array) → no profile yet, can't keyed-restore
+  // Keep legacy data quarantined in localStorage; first profile creation can absorb it.
+  return {};
+}
+
+export function loadLegacyFlatWatchlist(): TileData[] {
+  return safeRead<TileData[]>(
+    LEGACY_WATCHLIST_KEY,
+    [],
+    (p) => Array.isArray(p)
+  );
 }
 
 export function loadMode(): InteractionMode {
@@ -28,33 +67,88 @@ export function loadMode(): InteractionMode {
   }
 }
 
+interface AuthBlob {
+  accounts: Account[];
+  currentUserId: string | null;
+}
+
+interface ProfilesBlob {
+  profiles: Profile[];
+  currentProfileId: string | null;
+}
+
+interface SettingsBlob {
+  byProfile: Record<string, ProfileSettings>;
+}
+
+export function loadAuth(): AuthBlob {
+  return safeRead<AuthBlob>(
+    AUTH_KEY,
+    { accounts: [], currentUserId: null },
+    (p) => typeof p === 'object' && p !== null && Array.isArray((p as AuthBlob).accounts)
+  );
+}
+
+export function loadProfiles(): ProfilesBlob {
+  return safeRead<ProfilesBlob>(
+    PROFILES_KEY,
+    { profiles: [], currentProfileId: null },
+    (p) => typeof p === 'object' && p !== null && Array.isArray((p as ProfilesBlob).profiles)
+  );
+}
+
+export function loadSettings(): SettingsBlob {
+  return safeRead<SettingsBlob>(
+    SETTINGS_KEY,
+    { byProfile: {} },
+    (p) => typeof p === 'object' && p !== null && typeof (p as SettingsBlob).byProfile === 'object'
+  );
+}
+
 export function attachPersistence(store: Store<RootState>) {
   // Hydrate on boot
-  const initial = loadWatchlist();
-  if (initial.length > 0) {
-    store.dispatch(hydrateWatchlist(initial));
-  }
+  store.dispatch(hydrateAuth(loadAuth()));
+  store.dispatch(hydrateProfiles(loadProfiles()));
+  store.dispatch(hydrateSettings(loadSettings()));
+  store.dispatch(hydrateWatchlist({ byProfile: loadWatchlist() }));
 
   const savedMode = loadMode();
   store.dispatch(setInteractionMode(savedMode));
 
-  let lastWatchlist = store.getState().watchlist.items;
+  let lastWatchlist = store.getState().watchlist.byProfile;
   let lastMode = store.getState().ui.interactionMode;
+  let lastAuth = store.getState().auth;
+  let lastProfiles = store.getState().profile;
+  let lastSettings = store.getState().settings.byProfile;
+
   store.subscribe(() => {
     const state = store.getState();
-    const currWatchlist = state.watchlist.items;
-    if (currWatchlist !== lastWatchlist) {
-      lastWatchlist = currWatchlist;
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(currWatchlist));
-      } catch { /* ignore */ }
+
+    if (state.watchlist.byProfile !== lastWatchlist) {
+      lastWatchlist = state.watchlist.byProfile;
+      safeWrite(WATCHLIST_KEY, lastWatchlist);
     }
-    const currMode = state.ui.interactionMode;
-    if (currMode !== lastMode) {
-      lastMode = currMode;
-      try {
-        localStorage.setItem(MODE_KEY, currMode);
-      } catch { /* ignore */ }
+    if (state.ui.interactionMode !== lastMode) {
+      lastMode = state.ui.interactionMode;
+      safeWrite(MODE_KEY, lastMode);
+    }
+    if (state.auth !== lastAuth) {
+      lastAuth = state.auth;
+      safeWrite(AUTH_KEY, {
+        accounts: state.auth.accounts,
+        currentUserId: state.auth.currentUserId,
+      });
+    }
+    if (state.profile !== lastProfiles) {
+      lastProfiles = state.profile;
+      safeWrite(PROFILES_KEY, {
+        profiles: state.profile.profiles,
+        currentProfileId: state.profile.currentProfileId,
+      });
+    }
+    if (state.settings.byProfile !== lastSettings) {
+      lastSettings = state.settings.byProfile;
+      safeWrite(SETTINGS_KEY, { byProfile: lastSettings });
     }
   });
 }
@@ -62,7 +156,6 @@ export function attachPersistence(store: Store<RootState>) {
 /** Wipe all app data from localStorage and reload. */
 export function clearAllAppData() {
   try {
-    // Remove only our keys (defensive — don't nuke unrelated origins on this domain)
     const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
@@ -72,6 +165,5 @@ export function clearAllAppData() {
   } catch {
     // ignore
   }
-  // Reload to reset all in-memory state cleanly
   window.location.reload();
 }

@@ -7,6 +7,8 @@ import { navStyles } from '../styles/componentStyles/navStyles';
 import { useIsTvMode } from '../hooks/useMode';
 import { useResponsive } from '../hooks/useResponsive';
 import { usePageLoader } from '../hooks/usePageLoader';
+import { useSettings } from '../hooks/useSettings';
+import { AvatarDropdown } from './profile/AvatarDropdown';
 import type { PageId, InteractionMode } from '../state/slices/uiSlice';
 
 export const NavBar = memo(function NavBar() {
@@ -18,6 +20,7 @@ export const NavBar = memo(function NavBar() {
   const isTv = useIsTvMode();
   const { isMobile } = useResponsive();
   const loadPage = usePageLoader();
+  const settings = useSettings();
 
   const handleNavClick = useCallback((pageId: PageId) => {
     if (!isTv) {
@@ -37,7 +40,7 @@ export const NavBar = memo(function NavBar() {
     <nav style={navStyles.container(isTv && navFocused)} role="navigation" aria-label="Main navigation">
       <div style={navStyles.logo}>J</div>
       <ul style={navStyles.navList}>
-        {NAV_ITEMS.map((item, i) => {
+        {NAV_ITEMS.filter((item) => !(item.id === 'myList' && settings.disableMyList)).map((item, i) => {
           const isActive = activePage === item.id;
           const isFocused = isTv && navFocused && navIndex === i;
 
@@ -63,8 +66,8 @@ export const NavBar = memo(function NavBar() {
           );
         })}
       </ul>
-      {/* Web/TV toggle — desktop only */}
-      <div style={navStyles.toggleContainer}>
+      {/* Web/TV toggle + avatar dropdown — desktop only */}
+      <div style={{ ...navStyles.toggleContainer, display: 'flex', alignItems: 'center', gap: 12 }}>
         <button
           style={navStyles.toggleButton(interactionMode)}
           onClick={handleModeToggle}
@@ -74,6 +77,7 @@ export const NavBar = memo(function NavBar() {
           <span style={navStyles.toggleLabel(interactionMode === 'tv')}>TV</span>
           <span style={navStyles.toggleSlider(interactionMode === 'tv')} />
         </button>
+        <AvatarDropdown />
       </div>
     </nav>
   );

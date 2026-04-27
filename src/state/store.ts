@@ -4,6 +4,9 @@ import contentReducer from './slices/contentSlice';
 import uiReducer from './slices/uiSlice';
 import trailerReducer from './slices/trailerSlice';
 import watchlistReducer from './slices/watchlistSlice';
+import authReducer from './slices/authSlice';
+import profileReducer from './slices/profileSlice';
+import settingsReducer from './slices/settingsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +15,9 @@ export const store = configureStore({
     ui: uiReducer,
     trailer: trailerReducer,
     watchlist: watchlistReducer,
+    auth: authReducer,
+    profile: profileReducer,
+    settings: settingsReducer,
   },
 });
 

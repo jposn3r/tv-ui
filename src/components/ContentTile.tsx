@@ -12,6 +12,7 @@ import { openDetail } from '../state/slices/uiSlice';
 import { setTrailerPaused } from '../state/slices/trailerSlice';
 import { useIsTvMode } from '../hooks/useMode';
 import { useResponsive } from '../hooks/useResponsive';
+import { useSettings } from '../hooks/useSettings';
 import { getTmdbPosterUrl } from '../data/tmdb';
 import type { TileData } from '../state/slices/contentSlice';
 import type { NavigationAction } from '../engine/FocusEngine';
@@ -114,6 +115,7 @@ export const ContentTile = memo(function ContentTile({
   const dispatch = useDispatch();
   const isTv = useIsTvMode();
   const { isMobile } = useResponsive();
+  const settings = useSettings();
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
@@ -127,7 +129,8 @@ export const ContentTile = memo(function ContentTile({
   const trailerPaused = useSelector(selectTrailerPaused);
 
   // In TV mode, use focus-based trailer preview. In web mode, use hover.
-  const effectiveFocused = isTv ? isFocused : false;
+  // Disabled if user opted out of autoplay in settings.
+  const effectiveFocused = !settings.disableAutoplay && (isTv ? isFocused : false);
   const { showTrailer, trailerKey } = useTrailerPreview(tile, effectiveFocused, trailerPaused);
   const [videoPlaying, setVideoPlaying] = useState(false);
 
