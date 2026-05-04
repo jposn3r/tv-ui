@@ -36,7 +36,18 @@ export function YouTubePlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YT.Player | null>(null);
   const idRef = useRef(`yt-player-${++playerIdCounter}`);
-  const [isPlaying, setIsPlaying] = useState(false);
+  // When YT fires PLAYING it briefly draws a center pause/play indicator
+  // for ~1s. We delay revealing the wrapper until that indicator is gone,
+  // so the user never sees it flash through our fade-in. Hidden again
+  // immediately on PAUSED for the same reason.
+  const [showVideo, setShowVideo] = useState(false);
+  const revealTimerRef = useRef<number | null>(null);
+  const clearRevealTimer = () => {
+    if (revealTimerRef.current !== null) {
+      window.clearTimeout(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+  };
 
   // Store latest callbacks in refs to avoid recreating player
   const cbRef = useRef({ onReady, onPlaying, onEnded, onError });
@@ -46,7 +57,8 @@ export function YouTubePlayer({
   useEffect(() => {
     if (!apiReady || !containerRef.current || !videoKey) return;
 
-    setIsPlaying(false);
+    setShowVideo(false);
+    clearRevealTimer();
 
     // Create a div for the player inside our container
     const el = document.createElement('div');
@@ -78,8 +90,21 @@ export function YouTubePlayer({
         },
         onStateChange: (event: YT.PlayerEvent) => {
           if (event.data === YT.PlayerState.PLAYING) {
-            setIsPlaying(true);
             cbRef.current.onPlaying?.();
+            // Wait out YouTube's center indicator before revealing the
+            // video. ~1s is the visible duration of the indicator; small
+            // buffer added.
+            clearRevealTimer();
+            revealTimerRef.current = window.setTimeout(() => {
+              setShowVideo(true);
+              revealTimerRef.current = null;
+            }, 1100);
+          } else if (event.data === YT.PlayerState.PAUSED) {
+            // Hide immediately on pause so YT's centered pause icon never
+            // flashes through. Resume re-enters PLAYING above and re-runs
+            // the delayed reveal.
+            clearRevealTimer();
+            setShowVideo(false);
           } else if (event.data === YT.PlayerState.ENDED) {
             cbRef.current.onEnded?.();
           }
@@ -93,6 +118,7 @@ export function YouTubePlayer({
     playerRef.current = player;
 
     return () => {
+      clearRevealTimer();
       try {
         player.destroy();
       } catch {
@@ -130,17 +156,18 @@ export function YouTubePlayer({
     }
   }, [paused]);
 
-  // Fade the player out while paused so YouTube's native center play/pause
-  // indicator never shows — the backdrop image (rendered as a sibling in the
-  // hero section) shows through. Custom Pause/Play controls live in the
-  // bottom-right of the hero, so this big-icon overlay was redundant and
-  // distracting. Initial open already gates on isPlaying.
+  // The wrapper is gated on `showVideo` (a delayed-reveal flag set ~1.1s
+  // after PLAYING fires) plus `paused`, so YouTube's native center
+  // play/pause indicator never gets a chance to flash through during state
+  // transitions. The backdrop image (sibling in the hero section) shows
+  // through during the gap, and our custom bottom-right Pause/Mute
+  // controls cover the visible-state UX.
   const wrapperStyle: CSSProperties = {
     position: 'absolute',
     inset: 0,
     overflow: 'hidden',
     pointerEvents: 'none',
-    opacity: isPlaying && !paused ? 1 : 0,
+    opacity: showVideo && !paused ? 1 : 0,
     transition: `opacity ${fadeDuration}ms ease-out`,
     ...style,
   };
