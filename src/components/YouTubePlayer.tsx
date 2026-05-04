@@ -36,7 +36,18 @@ export function YouTubePlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YT.Player | null>(null);
   const idRef = useRef(`yt-player-${++playerIdCounter}`);
-  const [isPlaying, setIsPlaying] = useState(false);
+  // When YT fires PLAYING it briefly draws a center pause/play indicator
+  // for ~1s. We delay revealing the wrapper until that indicator is gone,
+  // so the user never sees it flash through our fade-in. Hidden again
+  // immediately on PAUSED for the same reason.
+  const [showVideo, setShowVideo] = useState(false);
+  const revealTimerRef = useRef<number | null>(null);
+  const clearRevealTimer = () => {
+    if (revealTimerRef.current !== null) {
+      window.clearTimeout(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+  };
 
   // Store latest callbacks in refs to avoid recreating player
   const cbRef = useRef({ onReady, onPlaying, onEnded, onError });
@@ -46,7 +57,8 @@ export function YouTubePlayer({
   useEffect(() => {
     if (!apiReady || !containerRef.current || !videoKey) return;
 
-    setIsPlaying(false);
+    setShowVideo(false);
+    clearRevealTimer();
 
     // Create a div for the player inside our container
     const el = document.createElement('div');
@@ -78,8 +90,21 @@ export function YouTubePlayer({
         },
         onStateChange: (event: YT.PlayerEvent) => {
           if (event.data === YT.PlayerState.PLAYING) {
-            setIsPlaying(true);
             cbRef.current.onPlaying?.();
+            // Wait out YouTube's center indicator before revealing the
+            // video. ~1s is the visible duration of the indicator; small
+            // buffer added.
+            clearRevealTimer();
+            revealTimerRef.current = window.setTimeout(() => {
+              setShowVideo(true);
+              revealTimerRef.current = null;
+            }, 1100);
+          } else if (event.data === YT.PlayerState.PAUSED) {
+            // Hide immediately on pause so YT's centered pause icon never
+            // flashes through. Resume re-enters PLAYING above and re-runs
+            // the delayed reveal.
+            clearRevealTimer();
+            setShowVideo(false);
           } else if (event.data === YT.PlayerState.ENDED) {
             cbRef.current.onEnded?.();
           }
@@ -93,6 +118,7 @@ export function YouTubePlayer({
     playerRef.current = player;
 
     return () => {
+      clearRevealTimer();
       try {
         player.destroy();
       } catch {
@@ -130,39 +156,20 @@ export function YouTubePlayer({
     }
   }, [paused]);
 
-  // Reveal as soon as YT enters PLAYING; the indicator mask below covers
-  // the only spot YouTube ever draws its centered play/pause icon, so we
-  // don't need to delay the video. Hide entirely while the user has the
-  // trailer paused — backdrop image shows through.
+  // The wrapper is gated on `showVideo` (a delayed-reveal flag set ~1.1s
+  // after PLAYING fires) plus `paused`, so YouTube's native center
+  // play/pause indicator never gets a chance to flash through during state
+  // transitions. The backdrop image (sibling in the hero section) shows
+  // through during the gap, and our custom bottom-right Pause/Mute
+  // controls cover the visible-state UX.
   const wrapperStyle: CSSProperties = {
     position: 'absolute',
     inset: 0,
     overflow: 'hidden',
     pointerEvents: 'none',
-    opacity: isPlaying && !paused ? 1 : 0,
+    opacity: showVideo && !paused ? 1 : 0,
     transition: `opacity ${fadeDuration}ms ease-out`,
     ...style,
-  };
-
-  // Cross-origin sandboxes the YouTube iframe — we can't reach in to hide
-  // the centered play/pause indicator with CSS or JS. Instead, mask the
-  // ~120px square at the geometric center of the player where it always
-  // draws: a subtle blur disc that turns the high-contrast YT icon into
-  // an indistinguishable soft blob. The video pixels behind the disc are
-  // also slightly blurred but only in this small spot — barely perceptible
-  // on a moving trailer.
-  const indicatorMaskStyle: CSSProperties = {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: 120,
-    height: 120,
-    borderRadius: '50%',
-    backdropFilter: 'blur(28px)',
-    WebkitBackdropFilter: 'blur(28px)',
-    pointerEvents: 'none',
-    zIndex: 3,
   };
 
   // Strategy: oversize the iframe so the YouTube title bar and bottom progress
@@ -193,7 +200,6 @@ export function YouTubePlayer({
   return (
     <div style={wrapperStyle}>
       <div ref={containerRef} style={iframeContainerStyle} />
-      <div style={indicatorMaskStyle} />
       <div style={bottomMaskStyle} />
     </div>
   );
