@@ -1,4 +1,4 @@
-import { memo, useEffect, useState, useCallback } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectDetailOverlay, selectWatchlist, selectTrailerMuted, selectCurrentProfileId, selectIsLiked } from '../state/selectors';
 import { closeDetail } from '../state/slices/uiSlice';
@@ -40,6 +40,20 @@ export const DetailOverlay = memo(function DetailOverlay() {
   // new trailer key arrives so a freshly opened panel auto-plays.
   const [detailPaused, setDetailPaused] = useState(false);
   useEffect(() => { setDetailPaused(false); }, [trailerKey]);
+
+  // TV mode: when focus climbs back up into the action-buttons zone (the
+  // top of the page, inside the hero), restore the page scroll to 0 so the
+  // hero comes back into view. EpisodeBrowser only auto-scrolls for the
+  // 'episodes' and 'seasons' zones, so without this, climbing UP from
+  // seasons → buttons leaves the page stuck at the season-tabs offset and
+  // the user never sees the hero again.
+  const tvScrollRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!isTv || !open) return;
+    if (zone === 'buttons' && tvScrollRef.current) {
+      tvScrollRef.current.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [isTv, open, zone]);
 
   useEffect(() => {
     if (!open || !tile?.tmdbId || !tile?.mediaType || settings.disableAutoplay) {
@@ -157,7 +171,7 @@ export const DetailOverlay = memo(function DetailOverlay() {
     };
 
     return (
-      <div style={fullscreen} role="dialog" aria-label={`Details for ${tile.title}`}>
+      <div ref={tvScrollRef} style={fullscreen} role="dialog" aria-label={`Details for ${tile.title}`}>
         {/* Hero with trailer */}
         <div style={heroSection}>
           <img src={backdropSrc} alt={tile.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

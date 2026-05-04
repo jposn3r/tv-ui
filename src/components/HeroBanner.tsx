@@ -201,10 +201,14 @@ export const HeroBanner = memo(function HeroBanner() {
         </div>
       </div>
 
-      <div style={heroStyles.pauseHint(!!videoVisible && videoPlaying)}>
-        <span style={heroStyles.pauseKbd}>P</span>
-        <span>to pause</span>
-      </div>
+      {/* P-to-pause is wired via TV input navigation only — don't advertise
+          it on web where the hotkey isn't actually bound. */}
+      {isTv && (
+        <div style={heroStyles.pauseHint(!!videoVisible && videoPlaying)}>
+          <span style={heroStyles.pauseKbd}>P</span>
+          <span>to pause</span>
+        </div>
+      )}
     </div>
   );
 });
