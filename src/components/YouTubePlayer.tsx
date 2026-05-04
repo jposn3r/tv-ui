@@ -130,12 +130,17 @@ export function YouTubePlayer({
     }
   }, [paused]);
 
+  // Fade the player out while paused so YouTube's native center play/pause
+  // indicator never shows — the backdrop image (rendered as a sibling in the
+  // hero section) shows through. Custom Pause/Play controls live in the
+  // bottom-right of the hero, so this big-icon overlay was redundant and
+  // distracting. Initial open already gates on isPlaying.
   const wrapperStyle: CSSProperties = {
     position: 'absolute',
     inset: 0,
     overflow: 'hidden',
     pointerEvents: 'none',
-    opacity: isPlaying ? 1 : 0,
+    opacity: isPlaying && !paused ? 1 : 0,
     transition: `opacity ${fadeDuration}ms ease-out`,
     ...style,
   };
