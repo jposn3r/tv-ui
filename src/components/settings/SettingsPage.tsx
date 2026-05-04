@@ -9,7 +9,8 @@ import { useSettings } from '../../hooks/useSettings';
 import { updateSetting } from '../../state/slices/settingsSlice';
 import { updateUsername, deleteAccount, logOut } from '../../state/slices/authSlice';
 import { setCurrentProfile } from '../../state/slices/profileSlice';
-import { setActivePage } from '../../state/slices/uiSlice';
+import { setActivePage, openVariantPicker } from '../../state/slices/uiSlice';
+import { useCurrentVariant } from '../../hooks/useCurrentVariant';
 import {
   selectAccounts,
   selectAllSettings,
@@ -32,6 +33,7 @@ export function SettingsPage() {
   const profile = useCurrentProfile();
   const user = useCurrentUser();
   const settings = useSettings();
+  const currentVariant = useCurrentVariant();
   const accounts = useSelector(selectAccounts);
   const allSettings = useSelector(selectAllSettings);
   const allWatchlists = useSelector(selectAllWatchlists);
@@ -112,6 +114,21 @@ export function SettingsPage() {
             }}
           >
             Edit profile
+          </button>
+        </div>
+        <div style={settingsStyles.row(false)}>
+          <div>
+            <div style={settingsStyles.rowLabel}>Streaming experience</div>
+            <div style={settingsStyles.rowDescription}>
+              Currently: {currentVariant?.name ?? 'Not set'}
+            </div>
+          </div>
+          <button
+            type="button"
+            style={settingsStyles.rowButton('secondary')}
+            onClick={() => dispatch(openVariantPicker())}
+          >
+            Switch experience
           </button>
         </div>
       </div>
@@ -262,7 +279,7 @@ export function SettingsPage() {
         </div>
       </div>
     ),
-  }), [profile, user, settings, editingUsername, usernameDraft, handleToggle, handleSaveUsername, handleExport, handleDeleteAccount, dispatch, confirmingDelete]);
+  }), [profile, user, settings, editingUsername, usernameDraft, handleToggle, handleSaveUsername, handleExport, handleDeleteAccount, dispatch, confirmingDelete, currentVariant]);
 
   // Mobile / TV: render all sections stacked
   if (isMobile) {

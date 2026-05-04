@@ -133,6 +133,7 @@ export function Shell() {
           </>
         )}
         <DetailOverlay />
+        <PerformanceHUD />
         {isMobile && <MobileNavBar />}
         {/* Bottom padding for mobile nav bar */}
         {isMobile && <div style={{ height: 64 }} />}

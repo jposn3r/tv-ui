@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { Shell } from './components/Shell';
 import { GlobalStyles } from './components/GlobalStyles';
 import { TvHintToast } from './components/TvHintToast';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { ProfileSelectScreen } from './components/profile/ProfileSelectScreen';
+import { VariantPickerScreen } from './components/variant/VariantPickerScreen';
 import { useInputNavigation } from './hooks/useInputNavigation';
 import { useIsTvMode } from './hooks/useMode';
 import { useCursorHide } from './hooks/useCursorHide';
@@ -13,6 +14,7 @@ import { useCurrentProfile } from './hooks/useProfile';
 import { setContent, setPageContent } from './state/slices/contentSlice';
 import { generateMockContent } from './data/mockContent';
 import { fetchTmdbContent, fetchLogosProgressive } from './data/tmdb';
+import type { RootState } from './state/store';
 
 function TvNavigation() {
   useInputNavigation();
@@ -24,6 +26,7 @@ export default function App() {
   const isTv = useIsTvMode();
   const isAuthed = useIsAuthenticated();
   const currentProfile = useCurrentProfile();
+  const variantPickerOpen = useSelector((s: RootState) => s.ui.variantPickerOpen);
   useCursorHide();
 
   // Only fetch home content once a profile is selected (deferring saves API calls when on auth screens)
@@ -51,23 +54,34 @@ export default function App() {
       });
   }, [dispatch, isAuthed, currentProfile?.id]);
 
+  // Show the variant picker when:
+  //   - profile has no variant yet (first entry), OR
+  //   - the user re-opened it from Settings → "Switch experience".
+  const needsVariantPicker = !!currentProfile && (!currentProfile.variant || variantPickerOpen);
+
   // Decide which screen to render
   let screen;
   if (!isAuthed) {
     screen = <AuthScreen />;
   } else if (!currentProfile) {
     screen = <ProfileSelectScreen />;
+  } else if (needsVariantPicker) {
+    screen = <VariantPickerScreen />;
   } else {
     screen = <Shell />;
   }
 
+  // Shell-driven inputs (and the TV hint toast) should only run when the
+  // actual Shell is rendering — auth, profile select, and the variant picker
+  // each have their own keyboard handling.
+  const shellActive = isAuthed && !!currentProfile && !needsVariantPicker;
+
   return (
     <>
       <GlobalStyles />
-      {/* TV input navigation only runs when on the main Shell — auth/profile screens have their own keyboard handlers */}
-      {isTv && isAuthed && currentProfile && <TvNavigation />}
+      {isTv && shellActive && <TvNavigation />}
       {screen}
-      {isTv && isAuthed && currentProfile && <TvHintToast />}
+      {isTv && shellActive && <TvHintToast />}
     </>
   );
 }

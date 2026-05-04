@@ -71,12 +71,16 @@ export function EpisodeBrowser({ tvId, isTv, focusedZone = null, focusedSeason =
     }
   }, [isTv, focusedZone, focusedEpisode, focusedSeason]);
 
-  if (loading || seasons.length === 0) return null;
-
   const container: CSSProperties = {
     padding: isTv ? '16px 48px 32px' : '16px 32px 24px',
     fontFamily: theme.typography.fontFamily,
+    // Fade content in when the API resolves so it hydrates within the
+    // already-final-sized panel rather than popping. No layout shift since the
+    // parent panel is pinned to its final height.
+    animation: 'overlay-item-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both',
   };
+
+  if (loading || seasons.length === 0) return null;
 
   const seasonTabs: CSSProperties = {
     display: 'flex',

@@ -1,4 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { VariantId } from '../../data/variants';
 
 export interface Profile {
   id: string;
@@ -6,6 +7,12 @@ export interface Profile {
   name: string;
   avatarUrl: string;
   createdAt: number;
+  /**
+   * Selected UI variant for this profile. Optional for backward compat —
+   * existing profiles will be missing this field and hit the variant picker
+   * on next entry, which is the intended migration path.
+   */
+  variant?: VariantId;
 }
 
 interface ProfileState {
@@ -58,6 +65,11 @@ export const profileSlice = createSlice({
     setCurrentProfile(state, action: PayloadAction<string | null>) {
       state.currentProfileId = action.payload;
     },
+    setProfileVariant(state, action: PayloadAction<{ id: string; variant: VariantId }>) {
+      const p = state.profiles.find((x) => x.id === action.payload.id);
+      if (!p) return;
+      p.variant = action.payload.variant;
+    },
   },
 });
 
@@ -67,5 +79,6 @@ export const {
   updateProfile,
   deleteProfile,
   setCurrentProfile,
+  setProfileVariant,
 } = profileSlice.actions;
 export default profileSlice.reducer;

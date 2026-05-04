@@ -1,6 +1,7 @@
 import { type CSSProperties, memo, useState, useRef, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { theme } from '../styles/theme';
+import { mergeStyles } from '../styles/styleEngine';
 import { getTileImageUrl } from '../data/mockContent';
 import { getTmdbBackdropUrl, getTmdbLogoUrl } from '../data/tmdb';
 import { FocusRing } from './FocusRing';
@@ -239,9 +240,16 @@ export const ContentTile = memo(function ContentTile({
       borderRadius: theme.tile.borderRadius,
     };
 
+    // Subtle staggered entrance on first mount. Cap the stagger at 12 tiles so
+    // late items don't feel sluggish — they all settle within ~700ms.
+    const enterDelay = Math.min(tileIndex, 12) * 30;
+    const entranceStyle: CSSProperties = {
+      animation: `tile-in 360ms cubic-bezier(0.22, 1, 0.36, 1) ${enterDelay}ms both`,
+    };
+
     return (
       <div
-        style={containerStyle}
+        style={mergeStyles(containerStyle, entranceStyle)}
         onClick={handleClick}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}

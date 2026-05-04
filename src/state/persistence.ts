@@ -1,6 +1,7 @@
 import type { Store } from '@reduxjs/toolkit';
 import type { RootState } from './store';
 import { hydrateWatchlist } from './slices/watchlistSlice';
+import { hydrateLikes } from './slices/likesSlice';
 import { setInteractionMode, type InteractionMode } from './slices/uiSlice';
 import { hydrateAuth } from './slices/authSlice';
 import { hydrateProfiles } from './slices/profileSlice';
@@ -16,6 +17,7 @@ const MODE_KEY = 'tvui:mode:v1';
 const AUTH_KEY = 'tvui:auth:v1';
 const PROFILES_KEY = 'tvui:profiles:v1';
 const SETTINGS_KEY = 'tvui:settings:v1';
+const LIKES_KEY = 'tvui:likes:v1';
 
 function safeRead<T>(key: string, fallback: T, validate?: (parsed: unknown) => boolean): T {
   try {
@@ -110,17 +112,27 @@ export function loadSettings(): SettingsBlob {
   );
 }
 
+export function loadLikes(): Record<string, string[]> {
+  return safeRead<Record<string, string[]>>(
+    LIKES_KEY,
+    {},
+    (p) => typeof p === 'object' && p !== null && !Array.isArray(p)
+  );
+}
+
 export function attachPersistence(store: Store<RootState>) {
   // Hydrate on boot
   store.dispatch(hydrateAuth(loadAuth()));
   store.dispatch(hydrateProfiles(loadProfiles()));
   store.dispatch(hydrateSettings(loadSettings()));
   store.dispatch(hydrateWatchlist({ byProfile: loadWatchlist() }));
+  store.dispatch(hydrateLikes({ byProfile: loadLikes() }));
 
   const savedMode = loadMode();
   store.dispatch(setInteractionMode(savedMode));
 
   let lastWatchlist = store.getState().watchlist.byProfile;
+  let lastLikes = store.getState().likes.byProfile;
   let lastMode = store.getState().ui.interactionMode;
   let lastAuth = store.getState().auth;
   let lastProfiles = store.getState().profile;
@@ -132,6 +144,10 @@ export function attachPersistence(store: Store<RootState>) {
     if (state.watchlist.byProfile !== lastWatchlist) {
       lastWatchlist = state.watchlist.byProfile;
       safeWrite(WATCHLIST_KEY, lastWatchlist);
+    }
+    if (state.likes.byProfile !== lastLikes) {
+      lastLikes = state.likes.byProfile;
+      safeWrite(LIKES_KEY, lastLikes);
     }
     if (state.ui.interactionMode !== lastMode) {
       lastMode = state.ui.interactionMode;

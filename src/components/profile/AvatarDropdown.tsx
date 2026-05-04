@@ -6,7 +6,7 @@ import { useResponsive } from '../../hooks/useResponsive';
 import { useIsTvMode } from '../../hooks/useMode';
 import { setCurrentProfile } from '../../state/slices/profileSlice';
 import { logOut } from '../../state/slices/authSlice';
-import { setActivePage } from '../../state/slices/uiSlice';
+import { setActivePage, setProfileDropdownOpen } from '../../state/slices/uiSlice';
 
 export function AvatarDropdown() {
   const dispatch = useDispatch();
@@ -18,6 +18,15 @@ export function AvatarDropdown() {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Mirror open state to redux so other UI (perf HUD) can shift out of the way.
+  useEffect(() => {
+    dispatch(setProfileDropdownOpen(open));
+    return () => {
+      // Ensure the flag isn't stuck on if the component unmounts while open.
+      if (open) dispatch(setProfileDropdownOpen(false));
+    };
+  }, [open, dispatch]);
 
   // Close on click outside (desktop only)
   useEffect(() => {

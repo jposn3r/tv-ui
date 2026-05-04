@@ -16,6 +16,7 @@ import {
 import { addProfileToAccount, removeProfileFromAccount } from '../../state/slices/authSlice';
 import { initProfileSettings, removeProfileSettings } from '../../state/slices/settingsSlice';
 import { removeProfileWatchlist } from '../../state/slices/watchlistSlice';
+import { removeProfileLikes } from '../../state/slices/likesSlice';
 import type { Profile } from '../../state/slices/profileSlice';
 
 type View = 'select' | 'create' | 'edit';
@@ -69,6 +70,7 @@ export function ProfileSelectScreen() {
     dispatch(removeProfileFromAccount({ accountId: user.id, profileId: editingProfile.id }));
     dispatch(removeProfileSettings(editingProfile.id));
     dispatch(removeProfileWatchlist(editingProfile.id));
+    dispatch(removeProfileLikes(editingProfile.id));
     setEditingProfile(null);
     setView('select');
     setManaging(false);

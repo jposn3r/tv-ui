@@ -73,3 +73,11 @@ export const selectIsInWatchlist = (id: string) => (state: RootState) => {
   return list.some((t) => t.id === id);
 };
 export const selectAllWatchlists = (state: RootState) => state.watchlist.byProfile;
+
+// --- Likes (per-profile) ---
+export const selectIsLiked = (id: string) => (state: RootState) => {
+  const profileId = state.profile.currentProfileId;
+  if (!profileId) return false;
+  const list = state.likes.byProfile[profileId] ?? [];
+  return list.includes(id);
+};

@@ -5,6 +5,9 @@ interface YouTubePlayerProps {
   videoKey: string;
   muted?: boolean;
   autoplay?: boolean;
+  /** When true, calls pauseVideo() on the underlying player. Toggling back to
+   *  false resumes playback. */
+  paused?: boolean;
   onReady?: () => void;
   onPlaying?: () => void;
   onEnded?: () => void;
@@ -21,6 +24,7 @@ export function YouTubePlayer({
   videoKey,
   muted = true,
   autoplay = true,
+  paused = false,
   onReady,
   onPlaying,
   onEnded,
@@ -113,6 +117,19 @@ export function YouTubePlayer({
     }
   }, [muted]);
 
+  // Respond to paused prop changes — drive the player imperatively. Wrapped in
+  // try/catch since the player may not have finished initializing.
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+    try {
+      if (paused) player.pauseVideo();
+      else player.playVideo();
+    } catch {
+      // Player not ready yet
+    }
+  }, [paused]);
+
   const wrapperStyle: CSSProperties = {
     position: 'absolute',
     inset: 0,
@@ -124,9 +141,10 @@ export function YouTubePlayer({
   };
 
   // Strategy: oversize the iframe so the YouTube title bar and bottom progress
-  // strip are pushed outside the wrapper's overflow:hidden box, AND lay a solid
-  // mask at the top that covers any residual chrome which slips back into view
-  // at small tile sizes (where the title bar is a larger relative portion).
+  // strip are pushed outside the wrapper's overflow:hidden box. The top is
+  // pulled up enough (-22%) that the title bar lands well above the visible
+  // area on its own — no top mask needed. A short bottom mask still hides the
+  // residual progress strip on the bottom edge.
   const iframeContainerStyle: CSSProperties = {
     position: 'absolute',
     top: '-22%',
@@ -135,20 +153,6 @@ export function YouTubePlayer({
     height: '144%',
   };
 
-  // Top mask is SOLID #141414 (matches app surface) for most of its height so
-  // any title remnants are completely opaque-covered, then a short gradient
-  // fade at the bottom edge so the transition into the video isn't a hard cut.
-  const topMaskStyle: CSSProperties = {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '22%',
-    background:
-      'linear-gradient(180deg, #141414 0%, #141414 70%, rgba(20,20,20,0.55) 88%, transparent 100%)',
-    pointerEvents: 'none',
-    zIndex: 2,
-  };
   const bottomMaskStyle: CSSProperties = {
     position: 'absolute',
     bottom: 0,
@@ -164,7 +168,6 @@ export function YouTubePlayer({
   return (
     <div style={wrapperStyle}>
       <div ref={containerRef} style={iframeContainerStyle} />
-      <div style={topMaskStyle} />
       <div style={bottomMaskStyle} />
     </div>
   );

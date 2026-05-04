@@ -1,15 +1,14 @@
 import { memo, useEffect, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectDetailOverlay, selectWatchlist, selectTrailerMuted, selectCurrentProfileId } from '../state/selectors';
+import { selectDetailOverlay, selectWatchlist, selectTrailerMuted, selectCurrentProfileId, selectIsLiked } from '../state/selectors';
 import { closeDetail } from '../state/slices/uiSlice';
 import { toggleWatchlist } from '../state/slices/watchlistSlice';
-import { setTrailerPaused } from '../state/slices/trailerSlice';
+import { toggleLike } from '../state/slices/likesSlice';
+import { setTrailerPaused, toggleTrailerMute } from '../state/slices/trailerSlice';
 import { getTileImageUrl } from '../data/mockContent';
 import { getTmdbBackdropUrl, getTmdbLogoUrl } from '../data/tmdb';
 import { fetchTrailerKey, fetchTvSeasons, fetchEpisodes } from '../data/tmdb';
 import { overlayStyles } from '../styles/componentStyles/overlayStyles';
-import { useScrollAnimation } from '../hooks/useScrollAnimation';
-import { easeOut } from '../engine/easing';
 import { mergeStyles } from '../styles/styleEngine';
 import { YouTubePlayer } from './YouTubePlayer';
 import { EpisodeBrowser } from './EpisodeBrowser';
@@ -28,12 +27,19 @@ export const DetailOverlay = memo(function DetailOverlay() {
   const isTv = useIsTvMode();
   const isWeb = useIsWebMode();
   const inList = !!tile && watchlist.some((t) => t.id === tile.id);
+  const isLiked = useSelector(selectIsLiked(tile?.id ?? ''));
   const BUTTONS = settings.disableMyList
     ? ['Play', 'Like']
     : ['Play', inList ? 'Remove from List' : 'Add to List', 'Like'];
 
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [, setVideoPlaying] = useState(false);
+  // Local pause state for the detail-view trailer. We don't reuse the global
+  // `trailerPaused` flag because that one suppresses tile/hero trailers and
+  // would default this player to paused on open. Reset to false whenever a
+  // new trailer key arrives so a freshly opened panel auto-plays.
+  const [detailPaused, setDetailPaused] = useState(false);
+  useEffect(() => { setDetailPaused(false); }, [trailerKey]);
 
   useEffect(() => {
     if (!open || !tile?.tmdbId || !tile?.mediaType || settings.disableAutoplay) {
@@ -62,14 +68,6 @@ export const DetailOverlay = memo(function DetailOverlay() {
     return () => { cancelled = true; };
   }, [open, tile?.tmdbId, tile?.mediaType]);
 
-  const slideAnim = useScrollAnimation('detail-slide', 100);
-
-  useEffect(() => {
-    if (open) {
-      slideAnim.animate(0, 300, easeOut);
-    }
-  }, [open, slideAnim]);
-
   const handleClose = useCallback(() => {
     dispatch(closeDetail());
     dispatch(setTrailerPaused(false));
@@ -81,11 +79,14 @@ export const DetailOverlay = memo(function DetailOverlay() {
     }
   }, [isWeb, handleClose]);
 
-  const handleButtonClick = useCallback((label: string) => {
+  const handleToggleList = useCallback(() => {
     if (!isWeb || !tile || !currentProfileId) return;
-    if (label === 'Add to List' || label === 'Remove from List') {
-      dispatch(toggleWatchlist({ profileId: currentProfileId, tile }));
-    }
+    dispatch(toggleWatchlist({ profileId: currentProfileId, tile }));
+  }, [dispatch, isWeb, tile, currentProfileId]);
+
+  const handleToggleLike = useCallback(() => {
+    if (!isWeb || !tile || !currentProfileId) return;
+    dispatch(toggleLike({ profileId: currentProfileId, tileId: tile.id }));
   }, [dispatch, isWeb, tile, currentProfileId]);
 
   // Web mode: close on Escape
@@ -227,31 +228,50 @@ export const DetailOverlay = memo(function DetailOverlay() {
   }
 
   // --- WEB MODE: Centered modal ---
-  const panelAnimStyle = {
-    transform: `translateY(${slideAnim.value}%)`,
+  // Smooth, compositor-driven entrance: backdrop fades in; panel scales +
+  // fades in; inner sections stagger in just behind the panel.
+  const backdropAnim: CSSProperties = {
+    animation: 'overlay-backdrop-in 240ms ease-out both',
   };
+  const panelAnim: CSSProperties = {
+    animation: 'overlay-panel-in 340ms cubic-bezier(0.22, 1, 0.36, 1) both',
+    transformOrigin: 'center center',
+    willChange: 'transform, opacity',
+  };
+  // For TV shows we lock the panel to its final size up front. Episode lists
+  // can be tall enough to push the panel to its maxHeight (90vh) once data
+  // arrives — that growth is the visible jerk at the end of the entrance. By
+  // pinning to 90vh from t=0 the panel never resizes; only the inner content
+  // hydrates. Movies render synchronously and don't need this.
+  const panelSize: CSSProperties = isTvShow
+    ? { minHeight: '90vh', height: '90vh' }
+    : {};
+  const itemAnim = (delayMs: number): CSSProperties => ({
+    animation: `overlay-item-in 380ms cubic-bezier(0.22, 1, 0.36, 1) ${delayMs}ms both`,
+  });
 
   return (
     <div
-      style={overlayStyles.backdrop}
+      style={mergeStyles(overlayStyles.backdrop, backdropAnim)}
       role="dialog"
       aria-label={`Details for ${tile.title}`}
       onClick={handleBackdropClick}
     >
-      <div style={mergeStyles(overlayStyles.panel, panelAnimStyle)}>
+      <div style={mergeStyles(overlayStyles.panel, panelSize, panelAnim)}>
         {/* Close button */}
         <button style={overlayStyles.closeButton} onClick={handleClose} aria-label="Close">
           {'\u2715'}
         </button>
 
         {/* Hero section */}
-        <div style={overlayStyles.heroSection}>
+        <div style={mergeStyles(overlayStyles.heroSection, itemAnim(80))}>
           <img src={backdropSrc} alt={tile.title} style={overlayStyles.heroImage} />
           {trailerKey && (
             <YouTubePlayer
               videoKey={trailerKey}
               muted={trailerMuted}
               autoplay={true}
+              paused={detailPaused}
               onPlaying={() => setVideoPlaying(true)}
               onEnded={() => setVideoPlaying(false)}
               onError={() => setVideoPlaying(false)}
@@ -266,10 +286,35 @@ export const DetailOverlay = memo(function DetailOverlay() {
               <div style={overlayStyles.heroTitle}>{tile.title}</div>
             )}
           </div>
+          {/* Trailer controls — only show while a trailer is loaded. Bottom-
+              right corner of the hero, custom because the YT iframe has
+              pointer-events disabled and native controls are off. */}
+          {trailerKey && (
+            <div style={overlayStyles.trailerControls}>
+              <button
+                type="button"
+                className="detail-icon-btn detail-icon-btn--small"
+                onClick={() => setDetailPaused((p) => !p)}
+                aria-label={detailPaused ? 'Play trailer' : 'Pause trailer'}
+                title={detailPaused ? 'Play trailer' : 'Pause trailer'}
+              >
+                {detailPaused ? <PlayGlyph /> : <PauseGlyph />}
+              </button>
+              <button
+                type="button"
+                className="detail-icon-btn detail-icon-btn--small"
+                onClick={() => dispatch(toggleTrailerMute())}
+                aria-label={trailerMuted ? 'Unmute trailer' : 'Mute trailer'}
+                title={trailerMuted ? 'Unmute trailer' : 'Mute trailer'}
+              >
+                {trailerMuted ? <MutedGlyph /> : <SoundGlyph />}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Info section */}
-        <div style={overlayStyles.infoSection}>
+        <div style={mergeStyles(overlayStyles.infoSection, itemAnim(160))}>
           <div style={overlayStyles.infoLeft}>
             <div style={overlayStyles.metaRow}>
               <span style={overlayStyles.matchBadge}>{match}% Match</span>
@@ -291,25 +336,182 @@ export const DetailOverlay = memo(function DetailOverlay() {
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div style={overlayStyles.buttonsRow}>
-          {BUTTONS.map((label) => (
-            <button
-              key={label}
-              style={overlayStyles.button(false, true)}
-              tabIndex={0}
-              onClick={() => handleButtonClick(label)}
+        {/* Action buttons — Play stays rectangular; My List + Like are
+            circular icon buttons whose fill state reflects the user's data. */}
+        <div style={mergeStyles(overlayStyles.buttonsRow, itemAnim(220))}>
+          <button
+            type="button"
+            style={overlayStyles.playButton}
+            tabIndex={0}
+            onClick={() => {/* play wiring TBD */}}
+            aria-label="Play"
+          >
+            <PlayIcon />
+            <span>Play</span>
+          </button>
+          {!settings.disableMyList && (
+            <IconCircleButton
+              active={inList}
+              onClick={handleToggleList}
+              ariaLabel={inList ? 'Remove from My List' : 'Add to My List'}
             >
-              {label}
-            </button>
-          ))}
+              {inList ? <CheckIcon /> : <PlusIcon />}
+            </IconCircleButton>
+          )}
+          <IconCircleButton
+            active={isLiked}
+            onClick={handleToggleLike}
+            ariaLabel={isLiked ? 'Remove like' : 'Like this title'}
+          >
+            <ThumbUpIcon filled={isLiked} />
+          </IconCircleButton>
         </div>
 
         {/* Episode browser for TV shows (web mode) */}
         {isTvShow && tile.tmdbId && (
-          <EpisodeBrowser tvId={tile.tmdbId} isTv={false} />
+          <div style={itemAnim(280)}>
+            <EpisodeBrowser tvId={tile.tmdbId} isTv={false} />
+          </div>
         )}
       </div>
     </div>
   );
 });
+
+// --- Circular icon button with hover state ---------------------------------
+
+interface IconCircleButtonProps {
+  active: boolean;
+  ariaLabel: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}
+
+function IconCircleButton({ active, ariaLabel, onClick, children }: IconCircleButtonProps) {
+  // Hover and focus styles are owned by CSS (.detail-icon-btn:hover /
+  // :focus-visible in GlobalStyles). React doesn't track hover here — that
+  // was the source of stuck-hover bugs when the inner icon swapped on click
+  // and the mouseleave event got dropped during the re-render.
+  return (
+    <button
+      type="button"
+      className={`detail-icon-btn${active ? ' is-active' : ''}`}
+      tabIndex={0}
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={ariaLabel}
+      title={ariaLabel}
+    >
+      {children}
+    </button>
+  );
+}
+
+// --- Inline icons -----------------------------------------------------------
+
+function PlayIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M5 3.5v17a1 1 0 0 0 1.55.83l13-8.5a1 1 0 0 0 0-1.66l-13-8.5A1 1 0 0 0 5 3.5z" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 5v14M5 12h14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M5 12.5l4.5 4.5L19 7.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PlayGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M6 4v16a1 1 0 0 0 1.55.83l13-8a1 1 0 0 0 0-1.66l-13-8A1 1 0 0 0 6 4z" />
+    </svg>
+  );
+}
+
+function PauseGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+      <rect x="14" y="4" width="4" height="16" rx="1" />
+    </svg>
+  );
+}
+
+function SoundGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M4 9v6h4l5 4V5L8 9H4z"
+        fill="currentColor"
+      />
+      <path
+        d="M16 8.5a4 4 0 0 1 0 7M19 6a7 7 0 0 1 0 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function MutedGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M4 9v6h4l5 4V5L8 9H4z"
+        fill="currentColor"
+      />
+      <path
+        d="M16 9l5 5M21 9l-5 5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ThumbUpIcon({ filled }: { filled: boolean }) {
+  // Single path renders as outline (stroke-only) or filled depending on state.
+  const d =
+    'M7 10v10H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1h3zm3 0V6.5A2.5 2.5 0 0 1 12.5 4 1.5 1.5 0 0 1 14 5.5V10h5.2a2 2 0 0 1 1.98 2.28l-1.05 7A2 2 0 0 1 18.15 21H10V10z';
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d={d}
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth={filled ? 0 : 1.8}
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

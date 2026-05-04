@@ -24,6 +24,15 @@ interface UIState {
   searchQuery: string;
   /** Transient hint shown when the user mouse-clicks something in TV mode that's keyboard-only. */
   tvHintVisible: boolean;
+  /**
+   * Re-open the variant picker on top of the app (e.g. from Settings →
+   * "Switch experience"). Transient, not persisted — closes on Esc/Back or
+   * after a variant is picked.
+   */
+  variantPickerOpen: boolean;
+  /** Whether the avatar dropdown menu in the nav is currently open. Shared
+   *  via redux so the perf HUD can shift out of its way. */
+  profileDropdownOpen: boolean;
 }
 
 const initialState: UIState = {
@@ -44,6 +53,8 @@ const initialState: UIState = {
   perfHudVisible: false,
   searchQuery: '',
   tvHintVisible: false,
+  variantPickerOpen: false,
+  profileDropdownOpen: false,
 };
 
 export const uiSlice = createSlice({
@@ -121,6 +132,15 @@ export const uiSlice = createSlice({
     hideTvHint(state) {
       state.tvHintVisible = false;
     },
+    openVariantPicker(state) {
+      state.variantPickerOpen = true;
+    },
+    closeVariantPicker(state) {
+      state.variantPickerOpen = false;
+    },
+    setProfileDropdownOpen(state, action: PayloadAction<boolean>) {
+      state.profileDropdownOpen = action.payload;
+    },
   },
 });
 
@@ -131,5 +151,7 @@ export const {
   setSearchQuery, appendSearchChar, deleteSearchChar, clearSearchQuery,
   setHeroFocused, setHeroButtonIndex, setInteractionMode,
   showTvHint, hideTvHint,
+  openVariantPicker, closeVariantPicker,
+  setProfileDropdownOpen,
 } = uiSlice.actions;
 export default uiSlice.reducer;

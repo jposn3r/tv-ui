@@ -13,8 +13,10 @@ export const overlayStyles = createStyles({
   },
 
   panel: {
-    width: '100%',
-    maxWidth: 820,
+    // Width matches the real Netflix web detail modal — generous on desktop,
+    // 90% on smaller screens, capped so it doesn't sprawl on ultrawide.
+    width: '90%',
+    maxWidth: 1200,
     maxHeight: '90vh',
     background: theme.colors.surface,
     borderRadius: 8,
@@ -23,8 +25,6 @@ export const overlayStyles = createStyles({
     display: 'flex',
     flexDirection: 'column',
     position: 'relative',
-    scrollbarWidth: 'thin',
-    scrollbarColor: 'rgba(255,255,255,0.15) transparent',
   },
 
   closeButton: {
@@ -188,4 +188,35 @@ export const overlayStyles = createStyles({
     transform: isFocused ? 'scale(1.05)' : 'scale(1)',
     transition: 'all 150ms ease-out',
   }),
+
+  // White rectangular Play button (Netflix style)
+  playButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '8px 22px',
+    borderRadius: 4,
+    border: 'none',
+    background: '#fff',
+    color: '#000',
+    fontSize: 16,
+    fontWeight: theme.typography.fontWeightBold,
+    fontFamily: theme.typography.fontFamily,
+    cursor: 'pointer',
+    transition: 'background 150ms ease-out',
+  },
+
+  // (Circular My List / Like icon buttons live in GlobalStyles.tsx as the
+  // .detail-icon-btn class — using CSS :hover keeps the hover state from
+  // getting stuck when the inner icon swaps on click.)
+
+  // Trailer controls overlay (bottom-right of the hero in web mode)
+  trailerControls: {
+    position: 'absolute' as const,
+    right: 16,
+    bottom: 16,
+    display: 'flex' as const,
+    gap: 8,
+    zIndex: 3,
+  },
 });
